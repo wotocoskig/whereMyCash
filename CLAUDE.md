@@ -22,6 +22,17 @@ Servidor de desenvolvimento em http://127.0.0.1:5000 (debug ligado).
 ## Modelo de dados
 Tabela `users`: `id`, `username` (único), `senha_hash`, `criado_em`.
 
+Tabela `orcamentos`: `id`, `usuario_id`, `categoria`, `limite` — UNIQUE(usuario_id,
+categoria). Limite de gasto mensal por categoria (upsert via ON CONFLICT). A home
+compara com o gasto do mês (verde/amarelo/vermelho). Rotas `/orcamentos` (GET/POST e
+`/orcamentos/excluir/<id>`).
+
+Tabela `recorrentes`: modelo que gera 1 transação/mês (`descricao`, `valor`, `tipo`,
+`categoria`, `forma`, `detalhes`, `dia`, `ultimo_mes_gerado`). `gerar_recorrentes()`
+roda ao abrir a home (e ao criar): cria o lançamento do mês atual se
+`ultimo_mes_gerado < AAAA-MM`. Sem backfill de meses pulados. Rotas `/recorrentes`
+(GET/POST e `/recorrentes/excluir/<id>`); excluir o recorrente mantém os lançamentos.
+
 Tabela `transacoes`:
 - `id` INTEGER PK AUTOINCREMENT
 - `descricao` TEXT
@@ -42,7 +53,14 @@ são dois botões (radio estilizado), CSS em `base.html`.
 
 **Categoria:** campo de texto livre com `<datalist>` das categorias que o próprio
 usuário já usou (lista personalizada auto-construída) — passado como `categorias`
-pelas rotas `/` e `/editar`. Descrição = livre (item); detalhes = nota opcional.
+pelas rotas `/`, `/editar`, `/orcamentos` e `/recorrentes`. Descrição = livre (item);
+detalhes = nota opcional.
+
+**Extrato:** tem busca (`q` em descrição/categoria/detalhes) + filtros por categoria
+(`cat`) e forma (`forma`). Os filtros afetam só a lista; cards/gráfico seguem o mês.
+
+**Parcelas:** gasto no crédito aceita `parcelas` (Nx) → cria N transações nos meses
+seguintes (helper `add_months`), sobra de centavos na 1ª. Sufixo `(i/N)` na descrição.
 
 **Dinheiro:** filtro `|moeda` formata no padrão BR (1.000.000,00). Usar SEMPRE nos
 valores exibidos. Inputs `type=number` continuam com ponto (sem separador).
@@ -68,6 +86,8 @@ adota transações antigas sem dono (`usuario_id IS NULL`).
 3. [x] Visual e relatórios (feito — gráfico de barras por categoria + filtro por mês; coluna `data` adicionada)
 4. [x] Acessar pelo celular (feito — hospedado no PythonAnywhere)
 5. [x] Multiusuário (login/cadastro, dados privados por usuário) + redesign moderno com tema claro/escuro
+6. [x] Ganho/Gasto + crédito/débito (já pago vs falta pagar) + detalhes opcionais + moeda BR
+7. [x] Busca/filtros no extrato, orçamento por categoria, parcelas no crédito, lançamentos recorrentes
 
 ## Produção
 - **No ar em:** https://gustavoaw.pythonanywhere.com (PythonAnywhere, plano grátis)
