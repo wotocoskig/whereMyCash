@@ -1,3 +1,4 @@
+import calendar
 import os
 import secrets
 import sqlite3
@@ -39,6 +40,16 @@ def get_db():
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def add_months(iso, n):
+    """Soma n meses a uma data 'AAAA-MM-DD', ajustando o dia ao fim do mês."""
+    d = datetime.strptime(iso, "%Y-%m-%d").date()
+    total = d.month - 1 + n
+    ano = d.year + total // 12
+    mes = total % 12 + 1
+    dia = min(d.day, calendar.monthrange(ano, mes)[1])
+    return date(ano, mes, dia).isoformat()
 
 
 def init_db():
@@ -373,13 +384,37 @@ def adicionar():
     # Forma de pagamento só faz sentido para gastos; ganhos ficam NULL.
     forma = request.form.get('forma') if tipo == 'DESPESA' else None
     detalhes = request.form.get('detalhes', '').strip() or None
+    uid = session['usuario_id']
+
+    # Parcelamento: só vale para gasto no crédito.
+    parcelas = 1
+    if tipo == 'DESPESA' and forma == 'CREDITO':
+        try:
+            parcelas = max(1, min(60, int(request.form.get('parcelas', '1'))))
+        except ValueError:
+            parcelas = 1
 
     conn = get_db()
-    conn.execute(
-        "INSERT INTO transacoes (descricao, valor, tipo, categoria, data, forma, detalhes, usuario_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (descricao, valor, tipo, categoria, data_lanc, forma, detalhes, session['usuario_id']),
-    )
+    if parcelas > 1:
+        # Divide o valor em N parcelas; a sobra de centavos vai pra 1ª parcela.
+        base = round(valor / parcelas, 2)
+        sobra = round(valor - base * parcelas, 2)
+        for i in range(parcelas):
+            v = round(base + sobra, 2) if i == 0 else base
+            conn.execute(
+                "INSERT INTO transacoes (descricao, valor, tipo, categoria, data, forma, detalhes, usuario_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    f"{descricao} ({i + 1}/{parcelas})",
+                    v, tipo, categoria, add_months(data_lanc, i), forma, detalhes, uid,
+                ),
+            )
+    else:
+        conn.execute(
+            "INSERT INTO transacoes (descricao, valor, tipo, categoria, data, forma, detalhes, usuario_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (descricao, valor, tipo, categoria, data_lanc, forma, detalhes, uid),
+        )
     conn.commit()
     conn.close()
 

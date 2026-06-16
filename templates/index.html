@@ -42,6 +42,7 @@
         .busca-linha select { flex: 1; }
         .busca-linha .btn { width: auto; flex-shrink: 0; }
         .limpar { display: inline-block; margin-top: 6px; font-size: 13px; }
+        #campo-parcelas small { display: block; font-size: 12px; margin-top: 2px; }
         @media (max-width: 480px) {
             .stat .num { font-size: 16px; }
             .stat .rotulo { font-size: 10px; }
@@ -101,10 +102,15 @@
             </datalist>
             <textarea name="detalhes" rows="2" placeholder="Detalhes (opcional) — o que você comprou?"></textarea>
             <input type="date" name="data" value="{{ hoje }}" required>
-            <select name="forma" id="forma">
+            <select name="forma" id="forma" onchange="atualizarCampos()">
                 <option value="DEBITO">Débito (já pago)</option>
                 <option value="CREDITO">Crédito (a pagar)</option>
             </select>
+            <div id="campo-parcelas">
+                <label for="parcelas">Parcelas</label>
+                <input type="number" id="parcelas" name="parcelas" min="1" max="60" value="1">
+                <small class="muted">Em 2x ou mais, o valor é dividido pelos meses da fatura.</small>
+            </div>
             <button type="submit" class="btn">Salvar lançamento</button>
         </form>
     </div>
@@ -128,12 +134,17 @@
     {% endif %}
 
     <script>
-        // Mostra a forma de pagamento só quando o lançamento é um Gasto.
-        function toggleForma() {
+        // Forma de pagamento só em Gasto; parcelas só em Gasto no Crédito.
+        function atualizarCampos() {
             var ehGasto = document.getElementById('tipo-gasto').checked;
-            document.getElementById('forma').style.display = ehGasto ? 'block' : 'none';
+            var forma = document.getElementById('forma');
+            forma.style.display = ehGasto ? 'block' : 'none';
+            var ehCredito = forma.value === 'CREDITO';
+            document.getElementById('campo-parcelas').style.display = (ehGasto && ehCredito) ? 'block' : 'none';
         }
-        toggleForma();
+        // Compatibilidade com os botões de tipo, que chamam toggleForma().
+        function toggleForma() { atualizarCampos(); }
+        atualizarCampos();
     </script>
 
     <!-- Gráfico de gastos por categoria -->
