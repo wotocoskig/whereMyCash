@@ -1,10 +1,13 @@
+import os
 import sqlite3
 from datetime import date, datetime
 from flask import Flask, render_template, request, redirect
 
 app = Flask(__name__)
 
-DB = "database.db"
+# Caminho absoluto do banco (funciona localmente e em servidor de hospedagem,
+# independente de qual seja o diretório de trabalho do processo).
+DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
 
 
 def get_db():
@@ -204,6 +207,10 @@ def editar(id):
     return render_template('editar.html', t=transacao)
 
 
+# Garante que o banco/tabela existam assim que o módulo é importado.
+# Necessário em servidores de produção (WSGI), onde o bloco __main__ não roda.
+init_db()
+
+
 if __name__ == '__main__':
-    init_db()
     app.run(debug=True)
