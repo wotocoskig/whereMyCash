@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Orçamentos{% endblock %}
+
+{% block extra_css %}
+        .orc-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .orc-item:last-child { border-bottom: none; }
+        .orc-cat { font-weight: 600; }
+        .orc-lim { color: var(--muted); font-size: 14px; }
+{% endblock %}
+
+{% block conteudo %}
+    <div class="card">
+        <h3>🎯 Novo orçamento</h3>
+        <p class="muted" style="margin-top: -6px;">Defina um limite de gasto mensal por categoria.</p>
+        <form action="{{ url_for('orcamentos') }}" method="POST">
+            <input type="text" name="categoria" list="lista-categorias"
+                   placeholder="Categoria (digite ou escolha a sua)" required>
+            <datalist id="lista-categorias">
+                {% for c in categorias %}
+                    <option value="{{ c }}"></option>
+                {% endfor %}
+            </datalist>
+            <input type="number" step="0.01" name="limite" placeholder="Limite mensal (ex: 600.00)" required>
+            <button type="submit" class="btn">Salvar orçamento</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3>Seus orçamentos</h3>
+        {% if orcamentos %}
+            {% for o in orcamentos %}
+                <div class="orc-item">
+                    <div>
+                        <div class="orc-cat">{{ o.categoria }}</div>
+                        <div class="orc-lim">Limite: R$ {{ o.limite|moeda }}</div>
+                    </div>
+                    <form action="{{ url_for('excluir_orcamento', id=o.id) }}" method="POST"
+                          onsubmit="return confirm('Excluir este orçamento?');" style="width: auto;">
+                        <button type="submit" class="btn-acao"
+                                style="width:auto; border:1px solid var(--border); background:var(--card-bg); color:var(--text); padding:7px 12px; border-radius:9px; cursor:pointer;">🗑️</button>
+                    </form>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="vazio" style="color: var(--muted); font-style: italic;">
+                Nenhum orçamento ainda. Crie o primeiro acima! 👆
+            </p>
+        {% endif %}
+    </div>
+{% endblock %}

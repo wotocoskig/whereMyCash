@@ -87,6 +87,17 @@ def init_db():
         # Anotação opcional do usuário sobre a compra (o que foi comprado etc.).
         conn.execute("ALTER TABLE transacoes ADD COLUMN detalhes TEXT")
 
+    # Orçamentos: limite de gasto por categoria, por usuário (um por categoria).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS orcamentos (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER NOT NULL,
+            categoria  TEXT    NOT NULL,
+            limite     REAL    NOT NULL,
+            UNIQUE (usuario_id, categoria)
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -242,6 +253,10 @@ def index():
         "SELECT * FROM transacoes WHERE usuario_id = ? ORDER BY data DESC, id DESC",
         (uid,),
     ).fetchall()
+    orcamentos_db = conn.execute(
+        "SELECT categoria, limite FROM orcamentos WHERE usuario_id = ?",
+        (uid,),
+    ).fetchall()
     conn.close()
 
     # Meses disponíveis para o filtro (do mais recente ao mais antigo)
@@ -286,6 +301,23 @@ def index():
         for cat, total in sorted(gastos.items(), key=lambda x: x[1], reverse=True)
     ]
 
+    # Orçamentos: compara o gasto do mês na categoria com o limite definido.
+    orcamentos_status = []
+    for o in orcamentos_db:
+        gasto = gastos.get(o["categoria"], 0)
+        limite = o["limite"]
+        pct = (gasto / limite * 100) if limite else 0
+        orcamentos_status.append({
+            "categoria": o["categoria"],
+            "gasto": gasto,
+            "limite": limite,
+            "pct": pct,
+            "pct_barra": min(pct, 100),
+            "estourou": gasto > limite,
+            "restante": limite - gasto,
+        })
+    orcamentos_status.sort(key=lambda x: x["pct"], reverse=True)
+
     # Extrato: parte do recorte do mês e aplica busca + filtros de categoria/forma.
     q = request.args.get('q', '').strip()
     cat_sel = request.args.get('cat', '')
@@ -319,6 +351,7 @@ def index():
         total_pago=total_pago,
         pct_pago=pct_pago,
         resumo=resumo,
+        orcamentos=orcamentos_status,
         meses=meses,
         categorias=categorias,
         mes_sel=mes_sel,
@@ -411,6 +444,62 @@ def editar(id):
 
     categorias = [c["categoria"] for c in cats]
     return render_template('editar.html', t=transacao, categorias=categorias)
+
+
+@app.route('/orcamentos', methods=['GET', 'POST'])
+@login_required
+def orcamentos():
+    uid = session['usuario_id']
+    conn = get_db()
+
+    if request.method == 'POST':
+        categoria = request.form.get('categoria', '').strip()
+        try:
+            limite = float(request.form.get('limite', '0'))
+        except ValueError:
+            limite = 0
+        if categoria and limite > 0:
+            # Upsert: um limite por categoria do usuário.
+            conn.execute(
+                "INSERT INTO orcamentos (usuario_id, categoria, limite) VALUES (?, ?, ?) "
+                "ON CONFLICT (usuario_id, categoria) DO UPDATE SET limite = excluded.limite",
+                (uid, categoria, limite),
+            )
+            conn.commit()
+        else:
+            flash("Informe uma categoria e um limite maior que zero.", "erro")
+        conn.close()
+        return redirect(url_for('orcamentos'))
+
+    lista = conn.execute(
+        "SELECT * FROM orcamentos WHERE usuario_id = ? ORDER BY categoria COLLATE NOCASE",
+        (uid,),
+    ).fetchall()
+    cats = conn.execute(
+        "SELECT DISTINCT categoria FROM transacoes "
+        "WHERE usuario_id = ? AND categoria <> '' ORDER BY categoria COLLATE NOCASE",
+        (uid,),
+    ).fetchall()
+    conn.close()
+
+    return render_template(
+        'orcamentos.html',
+        orcamentos=lista,
+        categorias=[c["categoria"] for c in cats],
+    )
+
+
+@app.route('/orcamentos/excluir/<int:id>', methods=['POST'])
+@login_required
+def excluir_orcamento(id):
+    conn = get_db()
+    conn.execute(
+        "DELETE FROM orcamentos WHERE id = ? AND usuario_id = ?",
+        (id, session['usuario_id']),
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for('orcamentos'))
 
 
 # Garante que as tabelas existam assim que o módulo é importado (produção/WSGI).

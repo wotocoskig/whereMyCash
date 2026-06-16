@@ -15,6 +15,11 @@
         .barra-trilho { background: var(--track); border-radius: 6px; overflow: hidden; height: 16px; }
         .barra-preenchida { background: linear-gradient(90deg, var(--accent), var(--accent-hover)); height: 100%; border-radius: 6px; transition: width 0.4s ease; }
         .barra-paga { background: var(--receita); height: 100%; border-radius: 6px; transition: width 0.4s ease; }
+        .barra-orc { height: 100%; border-radius: 6px; transition: width 0.4s ease; }
+        .orc-ok { background: var(--receita); }
+        .orc-alerta { background: #f39c12; }
+        .orc-estourou { background: var(--despesa); }
+        .orc-aviso { font-size: 13px; margin-top: 3px; }
         .pagto-linha { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
         .tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; vertical-align: middle; }
         .tag-credito { background: rgba(220, 38, 38, 0.13); color: var(--despesa); }
@@ -152,6 +157,32 @@
             <p class="vazio">Nenhuma despesa neste período.</p>
         {% endif %}
     </div>
+
+    <!-- Acompanhamento de orçamentos -->
+    {% if orcamentos %}
+    <div class="card">
+        <h3>🎯 Orçamentos do mês</h3>
+        <ul class="grafico">
+            {% for o in orcamentos %}
+                <li>
+                    <div class="barra-topo">
+                        <strong>{{ o.categoria }}</strong>
+                        <span class="muted">R$ {{ o.gasto|moeda }} / R$ {{ o.limite|moeda }} ({{ "%.0f"|format(o.pct) }}%)</span>
+                    </div>
+                    <div class="barra-trilho">
+                        <div class="barra-orc {% if o.estourou %}orc-estourou{% elif o.pct >= 80 %}orc-alerta{% else %}orc-ok{% endif %}"
+                             style="width: {{ o.pct_barra }}%;"></div>
+                    </div>
+                    {% if o.estourou %}
+                        <div class="orc-aviso despesa">⚠️ Estourou R$ {{ (-o.restante)|moeda }}</div>
+                    {% else %}
+                        <div class="orc-aviso muted">Resta R$ {{ o.restante|moeda }}</div>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 
     <!-- Extrato -->
     <div class="card">

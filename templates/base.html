@@ -54,6 +54,10 @@
         .brand .cash { color: var(--accent); }
         .topbar-actions { display: flex; align-items: center; gap: 8px; }
         .user-chip { color: var(--muted); font-size: 14px; white-space: nowrap; }
+        .nav { display: flex; gap: 8px; margin-bottom: 18px; }
+        .nav a { flex: 1; text-align: center; padding: 10px; border-radius: 12px; text-decoration: none;
+                 background: var(--card-bg); border: 1px solid var(--border); color: var(--text); font-weight: 600; font-size: 14px; }
+        .nav a:hover { border-color: var(--accent); color: var(--accent); }
         .icon-btn {
             background: var(--card-bg); border: 1px solid var(--border); color: var(--text);
             width: 40px; height: 40px; border-radius: 12px; cursor: pointer; font-size: 18px;
@@ -110,6 +114,13 @@
                 {% endif %}
             </div>
         </div>
+
+        {% if session.get('usuario_id') %}
+            <nav class="nav">
+                <a href="{{ url_for('index') }}">🏠 Início</a>
+                <a href="{{ url_for('orcamentos') }}">🎯 Orçamentos</a>
+            </nav>
+        {% endif %}
 
         {% with mensagens = get_flashed_messages(with_categories=true) %}
             {% for categoria, msg in mensagens %}
