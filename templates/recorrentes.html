@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Recorrentes{% endblock %}
+
+{% block extra_css %}
+        .rec-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .rec-item:last-child { border-bottom: none; }
+        .rec-desc { font-weight: 600; }
+        .rec-meta { color: var(--muted); font-size: 13px; }
+        #rec-campo-forma label, #rec-campo-forma { margin-top: 0; }
+{% endblock %}
+
+{% block conteudo %}
+    <div class="card">
+        <h3>🔁 Novo recorrente</h3>
+        <p class="muted" style="margin-top: -6px;">Cadastre uma vez; o lançamento é criado automaticamente todo mês.</p>
+        <form action="{{ url_for('recorrentes') }}" method="POST">
+            <div class="toggle-tipo">
+                <input type="radio" name="tipo" id="tipo-gasto" value="DESPESA" checked onchange="recAtualiza()">
+                <label for="tipo-gasto" class="opt opt-gasto">➖ Gasto</label>
+                <input type="radio" name="tipo" id="tipo-ganho" value="RECEITA" onchange="recAtualiza()">
+                <label for="tipo-ganho" class="opt opt-ganho">➕ Ganho</label>
+            </div>
+
+            <input type="text" name="descricao" placeholder="Descrição (ex: Aluguel)" required>
+            <input type="number" step="0.01" name="valor" placeholder="Valor (ex: 1500.00)" required>
+            <input type="text" name="categoria" list="lista-categorias"
+                   placeholder="Categoria (digite ou escolha a sua)" required>
+            <datalist id="lista-categorias">
+                {% for c in categorias %}
+                    <option value="{{ c }}"></option>
+                {% endfor %}
+            </datalist>
+
+            <label for="dia">Dia do mês</label>
+            <input type="number" id="dia" name="dia" min="1" max="31" value="1" required>
+
+            <div id="rec-campo-forma">
+                <select name="forma" id="forma">
+                    <option value="DEBITO">Débito (já pago)</option>
+                    <option value="CREDITO">Crédito (a pagar)</option>
+                </select>
+            </div>
+
+            <textarea name="detalhes" rows="2" placeholder="Detalhes (opcional)"></textarea>
+            <button type="submit" class="btn">Salvar recorrente</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3>Seus recorrentes</h3>
+        {% if recorrentes %}
+            {% for r in recorrentes %}
+                <div class="rec-item">
+                    <div>
+                        <div class="rec-desc">
+                            {{ r.descricao }}
+                            <span class="{{ r.tipo|lower }}">R$ {{ r.valor|moeda }}</span>
+                        </div>
+                        <div class="rec-meta">
+                            {{ r.categoria }} • todo dia {{ r.dia }}
+                            {% if r.tipo == 'DESPESA' %} • {{ 'crédito' if r.forma == 'CREDITO' else 'débito' }}{% endif %}
+                        </div>
+                    </div>
+                    <form action="{{ url_for('excluir_recorrente', id=r.id) }}" method="POST"
+                          onsubmit="return confirm('Excluir este recorrente? (os lançamentos já criados continuam)');" style="width: auto;">
+                        <button type="submit" class="btn-acao"
+                                style="width:auto; border:1px solid var(--border); background:var(--card-bg); color:var(--text); padding:7px 12px; border-radius:9px; cursor:pointer;">🗑️</button>
+                    </form>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="muted" style="font-style: italic;">Nenhum recorrente ainda. Crie o primeiro acima! 👆</p>
+        {% endif %}
+    </div>
+
+    <script>
+        function recAtualiza() {
+            var ehGasto = document.getElementById('tipo-gasto').checked;
+            document.getElementById('rec-campo-forma').style.display = ehGasto ? 'block' : 'none';
+        }
+        recAtualiza();
+    </script>
+{% endblock %}

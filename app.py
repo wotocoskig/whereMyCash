@@ -109,8 +109,53 @@ def init_db():
         )
     """)
 
+    # Recorrentes: modelos que geram uma transação por mês (salário, aluguel...).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS recorrentes (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id  INTEGER NOT NULL,
+            descricao   TEXT    NOT NULL,
+            valor       REAL    NOT NULL,
+            tipo        TEXT    NOT NULL,
+            categoria   TEXT    NOT NULL,
+            forma       TEXT,
+            detalhes    TEXT,
+            dia         INTEGER NOT NULL,
+            ultimo_mes_gerado TEXT
+        )
+    """)
+
     conn.commit()
     conn.close()
+
+
+def gerar_recorrentes(conn, uid):
+    """Cria a transação do mês atual para cada recorrente ainda não gerado.
+
+    Usa a mesma conexão da chamada. Não faz commit (quem chama decide).
+    Comparação 'AAAA-MM' funciona como ordem cronológica (lexicográfica).
+    """
+    hoje = date.today()
+    mes_atual = hoje.strftime("%Y-%m")
+    pendentes = conn.execute(
+        "SELECT * FROM recorrentes WHERE usuario_id = ? "
+        "AND (ultimo_mes_gerado IS NULL OR ultimo_mes_gerado < ?)",
+        (uid, mes_atual),
+    ).fetchall()
+    for r in pendentes:
+        dia = min(r["dia"], calendar.monthrange(hoje.year, hoje.month)[1])
+        data_lanc = date(hoje.year, hoje.month, dia).isoformat()
+        forma = r["forma"] if r["tipo"] == "DESPESA" else None
+        conn.execute(
+            "INSERT INTO transacoes (descricao, valor, tipo, categoria, data, forma, detalhes, usuario_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (r["descricao"], r["valor"], r["tipo"], r["categoria"],
+             data_lanc, forma, r["detalhes"], uid),
+        )
+        conn.execute(
+            "UPDATE recorrentes SET ultimo_mes_gerado = ? WHERE id = ?",
+            (mes_atual, r["id"]),
+        )
 
 
 # ---- Autenticação ----
@@ -260,6 +305,9 @@ def index():
     uid = session['usuario_id']
 
     conn = get_db()
+    # Gera os lançamentos recorrentes do mês atual antes de ler as transações.
+    gerar_recorrentes(conn, uid)
+    conn.commit()
     todas = conn.execute(
         "SELECT * FROM transacoes WHERE usuario_id = ? ORDER BY data DESC, id DESC",
         (uid,),
@@ -535,6 +583,73 @@ def excluir_orcamento(id):
     conn.commit()
     conn.close()
     return redirect(url_for('orcamentos'))
+
+
+@app.route('/recorrentes', methods=['GET', 'POST'])
+@login_required
+def recorrentes():
+    uid = session['usuario_id']
+    conn = get_db()
+
+    if request.method == 'POST':
+        descricao = request.form.get('descricao', '').strip()
+        categoria = request.form.get('categoria', '').strip()
+        tipo = request.form.get('tipo', 'DESPESA')
+        forma = request.form.get('forma') if tipo == 'DESPESA' else None
+        detalhes = request.form.get('detalhes', '').strip() or None
+        try:
+            valor = float(request.form.get('valor', '0'))
+        except ValueError:
+            valor = 0
+        try:
+            dia = max(1, min(31, int(request.form.get('dia', '1'))))
+        except ValueError:
+            dia = 1
+
+        if descricao and categoria and valor > 0:
+            conn.execute(
+                "INSERT INTO recorrentes (usuario_id, descricao, valor, tipo, categoria, forma, detalhes, dia) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (uid, descricao, valor, tipo, categoria, forma, detalhes, dia),
+            )
+            # Gera já o lançamento do mês atual para o novo recorrente.
+            gerar_recorrentes(conn, uid)
+            conn.commit()
+            flash("Recorrente criado! O lançamento deste mês já foi gerado. 🔁", "ok")
+        else:
+            flash("Preencha descrição, categoria e um valor maior que zero.", "erro")
+        conn.close()
+        return redirect(url_for('recorrentes'))
+
+    lista = conn.execute(
+        "SELECT * FROM recorrentes WHERE usuario_id = ? ORDER BY tipo, descricao COLLATE NOCASE",
+        (uid,),
+    ).fetchall()
+    cats = conn.execute(
+        "SELECT DISTINCT categoria FROM transacoes "
+        "WHERE usuario_id = ? AND categoria <> '' ORDER BY categoria COLLATE NOCASE",
+        (uid,),
+    ).fetchall()
+    conn.close()
+
+    return render_template(
+        'recorrentes.html',
+        recorrentes=lista,
+        categorias=[c["categoria"] for c in cats],
+    )
+
+
+@app.route('/recorrentes/excluir/<int:id>', methods=['POST'])
+@login_required
+def excluir_recorrente(id):
+    conn = get_db()
+    conn.execute(
+        "DELETE FROM recorrentes WHERE id = ? AND usuario_id = ?",
+        (id, session['usuario_id']),
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for('recorrentes'))
 
 
 # Garante que as tabelas existam assim que o módulo é importado (produção/WSGI).
