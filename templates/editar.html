@@ -6,6 +6,16 @@
     <h1 style="font-size: 22px;">✏️ Editar lançamento</h1>
 
     <form action="/editar/{{ t.id }}" method="POST">
+        <!-- Seletor de tipo: dois botões -->
+        <div class="toggle-tipo">
+            <input type="radio" name="tipo" id="tipo-gasto" value="DESPESA"
+                   {% if t.tipo == 'DESPESA' %}checked{% endif %} onchange="toggleForma()">
+            <label for="tipo-gasto" class="opt opt-gasto">➖ Gasto</label>
+            <input type="radio" name="tipo" id="tipo-ganho" value="RECEITA"
+                   {% if t.tipo == 'RECEITA' %}checked{% endif %} onchange="toggleForma()">
+            <label for="tipo-ganho" class="opt opt-ganho">➕ Ganho</label>
+        </div>
+
         <label for="descricao">Descrição</label>
         <input type="text" id="descricao" name="descricao" value="{{ t.descricao }}" required>
 
@@ -17,12 +27,6 @@
 
         <label for="data">Data</label>
         <input type="date" id="data" name="data" value="{{ t.data }}" required>
-
-        <label for="tipo">Tipo</label>
-        <select id="tipo" name="tipo" onchange="toggleForma()">
-            <option value="DESPESA" {% if t.tipo == 'DESPESA' %}selected{% endif %}>Gasto</option>
-            <option value="RECEITA" {% if t.tipo == 'RECEITA' %}selected{% endif %}>Ganho</option>
-        </select>
 
         <div id="campoForma">
             <label for="forma">Forma de pagamento</label>
@@ -43,8 +47,8 @@
 <script>
     // Mostra a forma de pagamento só quando o tipo é Gasto.
     function toggleForma() {
-        var tipo = document.getElementById('tipo').value;
-        document.getElementById('campoForma').style.display = (tipo === 'DESPESA') ? 'block' : 'none';
+        var ehGasto = document.getElementById('tipo-gasto').checked;
+        document.getElementById('campoForma').style.display = ehGasto ? 'block' : 'none';
     }
     toggleForma();
 </script>

@@ -80,6 +80,18 @@
         .muted { color: var(--muted); }
         .receita { color: var(--receita); font-weight: 700; }
         .despesa { color: var(--despesa); font-weight: 700; }
+        /* Seletor de tipo (Gasto/Ganho) em dois botões */
+        .toggle-tipo { display: flex; gap: 8px; margin: 4px 0 10px; }
+        .toggle-tipo input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+        .toggle-tipo .opt {
+            flex: 1; margin: 0; text-align: center; padding: 12px; border-radius: 12px;
+            border: 1.5px solid var(--border); background: var(--card-bg); color: var(--muted);
+            font-weight: 700; cursor: pointer; user-select: none; transition: all 0.15s ease;
+        }
+        .toggle-tipo .opt:hover { border-color: var(--muted); }
+        .toggle-tipo input:checked + .opt-gasto { border-color: var(--despesa); color: var(--despesa); background: rgba(220, 38, 38, 0.12); }
+        .toggle-tipo input:checked + .opt-ganho { border-color: var(--receita); color: var(--receita); background: rgba(22, 163, 74, 0.12); }
+        .toggle-tipo input:focus-visible + .opt { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25); }
         {% block extra_css %}{% endblock %}
     </style>
 </head>

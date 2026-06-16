@@ -88,14 +88,18 @@
     <div class="card">
         <h3>➕ Nova transação</h3>
         <form action="/adicionar" method="POST">
+            <!-- Seletor de tipo: dois botões no topo -->
+            <div class="toggle-tipo">
+                <input type="radio" name="tipo" id="tipo-gasto" value="DESPESA" checked onchange="toggleForma()">
+                <label for="tipo-gasto" class="opt opt-gasto">➖ Gasto</label>
+                <input type="radio" name="tipo" id="tipo-ganho" value="RECEITA" onchange="toggleForma()">
+                <label for="tipo-ganho" class="opt opt-ganho">➕ Ganho</label>
+            </div>
+
             <input type="text" name="descricao" placeholder="Descrição (ex: Mercado)" required>
             <input type="number" step="0.01" name="valor" placeholder="Valor (ex: 50.00)" required>
             <input type="text" name="categoria" placeholder="Categoria (ex: Lazer, Casa, Transporte)" required>
             <input type="date" name="data" value="{{ hoje }}" required>
-            <select name="tipo" id="tipo" onchange="toggleForma()">
-                <option value="DESPESA">Gasto</option>
-                <option value="RECEITA">Ganho</option>
-            </select>
             <select name="forma" id="forma">
                 <option value="DEBITO">Débito (já pago)</option>
                 <option value="CREDITO">Crédito (a pagar)</option>
@@ -107,8 +111,8 @@
     <script>
         // Mostra a forma de pagamento só quando o lançamento é um Gasto.
         function toggleForma() {
-            var tipo = document.getElementById('tipo').value;
-            document.getElementById('forma').style.display = (tipo === 'DESPESA') ? 'block' : 'none';
+            var ehGasto = document.getElementById('tipo-gasto').checked;
+            document.getElementById('forma').style.display = ehGasto ? 'block' : 'none';
         }
         toggleForma();
     </script>
