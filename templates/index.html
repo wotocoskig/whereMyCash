@@ -25,6 +25,7 @@
         .extrato .info { flex: 1; min-width: 0; }
         .extrato .desc { font-weight: 600; }
         .extrato .meta { font-size: 12px; color: var(--muted); }
+        .extrato .detalhe { font-size: 13px; color: var(--muted); font-style: italic; margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
         .acoes { display: flex; gap: 6px; flex-shrink: 0; }
         .acoes form { width: auto; margin: 0; }
         .btn-acao { padding: 7px 12px; font-size: 13px; border-radius: 9px; text-decoration: none; display: inline-block; width: auto; margin: 0; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); cursor: pointer; }
@@ -99,6 +100,7 @@
             <input type="text" name="descricao" placeholder="Descrição (ex: Mercado)" required>
             <input type="number" step="0.01" name="valor" placeholder="Valor (ex: 50.00)" required>
             <input type="text" name="categoria" placeholder="Categoria (ex: Lazer, Casa, Transporte)" required>
+            <textarea name="detalhes" rows="2" placeholder="Detalhes (opcional) — o que você comprou?"></textarea>
             <input type="date" name="data" value="{{ hoje }}" required>
             <select name="forma" id="forma">
                 <option value="DEBITO">Débito (já pago)</option>
@@ -154,6 +156,9 @@
                             <span class="tag tag-debito">débito</span>
                         {% endif %}
                         <div class="meta">{{ t.categoria }} • {{ t.data|data_br }}</div>
+                        {% if t.detalhes %}
+                            <div class="detalhe">📝 {{ t.detalhes }}</div>
+                        {% endif %}
                     </span>
                     <span class="acoes">
                         <a class="btn-acao" href="/editar/{{ t.id }}">✏️</a>

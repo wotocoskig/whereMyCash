@@ -32,6 +32,8 @@ Tabela `transacoes`:
 - `usuario_id` INTEGER → dono da transação (FK lógica para `users.id`)
 - `forma` TEXT → só para GASTOS: `CREDITO` (a pagar, cai na fatura) ou `DEBITO`
   (já pago). Ganhos e dados antigos ficam NULL = tratados como "já pago".
+- `detalhes` TEXT → anotação opcional do usuário (o que foi comprado). Vazio vira
+  NULL. Aparece no extrato só quando preenchido.
 
 **UI:** "Ganho"/"Gasto" são só rótulos de tela; no banco continuam `RECEITA`/`DESPESA`.
 A home mostra "Já pago" (débito + NULL) vs "Falta pagar" (crédito) do período, pra

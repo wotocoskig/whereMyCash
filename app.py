@@ -83,6 +83,9 @@ def init_db():
         # ou 'DEBITO' (já saiu da conta). Ganhos e dados antigos ficam NULL,
         # tratados como "já pago / à vista".
         conn.execute("ALTER TABLE transacoes ADD COLUMN forma TEXT")
+    if "detalhes" not in colunas:
+        # Anotação opcional do usuário sobre a compra (o que foi comprado etc.).
+        conn.execute("ALTER TABLE transacoes ADD COLUMN detalhes TEXT")
 
     conn.commit()
     conn.close()
@@ -294,12 +297,13 @@ def adicionar():
     data_lanc = request.form.get('data') or date.today().isoformat()
     # Forma de pagamento só faz sentido para gastos; ganhos ficam NULL.
     forma = request.form.get('forma') if tipo == 'DESPESA' else None
+    detalhes = request.form.get('detalhes', '').strip() or None
 
     conn = get_db()
     conn.execute(
-        "INSERT INTO transacoes (descricao, valor, tipo, categoria, data, forma, usuario_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (descricao, valor, tipo, categoria, data_lanc, forma, session['usuario_id']),
+        "INSERT INTO transacoes (descricao, valor, tipo, categoria, data, forma, detalhes, usuario_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (descricao, valor, tipo, categoria, data_lanc, forma, detalhes, session['usuario_id']),
     )
     conn.commit()
     conn.close()
@@ -330,9 +334,10 @@ def editar(id):
     if request.method == 'POST':
         tipo = request.form['tipo']
         forma = request.form.get('forma') if tipo == 'DESPESA' else None
+        detalhes = request.form.get('detalhes', '').strip() or None
         conn.execute(
             "UPDATE transacoes SET descricao = ?, valor = ?, tipo = ?, "
-            "categoria = ?, data = ?, forma = ? WHERE id = ? AND usuario_id = ?",
+            "categoria = ?, data = ?, forma = ?, detalhes = ? WHERE id = ? AND usuario_id = ?",
             (
                 request.form['descricao'],
                 float(request.form['valor']),
@@ -340,6 +345,7 @@ def editar(id):
                 request.form['categoria'],
                 request.form.get('data') or date.today().isoformat(),
                 forma,
+                detalhes,
                 id,
                 uid,
             ),
