@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}wheresMyCash{% endblock %}</title>
+    <script>
+        // Aplica o tema salvo ANTES de renderizar (evita "piscada" de cor)
+        (function () {
+            var t = localStorage.getItem('tema') || 'light';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
+    <style>
+        :root {
+            --bg: #f0f2f5;
+            --card-bg: #ffffff;
+            --text: #1c1e21;
+            --muted: #65676b;
+            --border: #e4e6eb;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --receita: #16a34a;
+            --despesa: #dc2626;
+            --track: #e9ebef;
+            --shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+        }
+        [data-theme="dark"] {
+            --bg: #18191a;
+            --card-bg: #242526;
+            --text: #e4e6eb;
+            --muted: #b0b3b8;
+            --border: #3a3b3c;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --receita: #4ade80;
+            --despesa: #f87171;
+            --track: #3a3b3c;
+            --shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+        .wrap { max-width: 640px; margin: 0 auto; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; gap: 10px; }
+        .brand { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+        .brand .cash { color: var(--accent); }
+        .topbar-actions { display: flex; align-items: center; gap: 8px; }
+        .user-chip { color: var(--muted); font-size: 14px; white-space: nowrap; }
+        .icon-btn {
+            background: var(--card-bg); border: 1px solid var(--border); color: var(--text);
+            width: 40px; height: 40px; border-radius: 12px; cursor: pointer; font-size: 18px;
+            display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+            transition: border-color 0.15s ease;
+        }
+        .icon-btn:hover { border-color: var(--accent); }
+        .card { background: var(--card-bg); border-radius: 16px; box-shadow: var(--shadow); padding: 22px; margin-bottom: 18px; }
+        h1, h2, h3 { margin: 0 0 14px; }
+        h3 { font-size: 17px; }
+        label { font-weight: 600; font-size: 14px; display: block; margin-top: 6px; }
+        input, select, button {
+            font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border);
+            background: var(--card-bg); color: var(--text); width: 100%; margin: 6px 0;
+        }
+        input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
+        .btn { background: var(--accent); color: #fff; border: none; font-weight: 700; cursor: pointer; transition: background 0.15s ease; }
+        .btn:hover { background: var(--accent-hover); }
+        .link { color: var(--accent); text-decoration: none; font-weight: 600; }
+        .link:hover { text-decoration: underline; }
+        .flash { padding: 12px 14px; border-radius: 12px; margin-bottom: 14px; font-size: 14px; font-weight: 500; }
+        .flash.erro { background: rgba(220, 38, 38, 0.12); color: var(--despesa); }
+        .flash.ok { background: rgba(22, 163, 74, 0.12); color: var(--receita); }
+        .muted { color: var(--muted); }
+        .receita { color: var(--receita); font-weight: 700; }
+        .despesa { color: var(--despesa); font-weight: 700; }
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="topbar">
+            <div class="brand">wheres<span class="cash">MyCash</span> 💰</div>
+            <div class="topbar-actions">
+                {% if session.get('usuario_nome') %}
+                    <span class="user-chip">Olá, {{ session['usuario_nome'] }}</span>
+                {% endif %}
+                <button class="icon-btn" id="btnTema" onclick="alternarTema()" title="Alternar tema">🌙</button>
+                {% if session.get('usuario_id') %}
+                    <a class="icon-btn" href="{{ url_for('logout') }}" title="Sair">⏻</a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% with mensagens = get_flashed_messages(with_categories=true) %}
+            {% for categoria, msg in mensagens %}
+                <div class="flash {{ categoria }}">{{ msg }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        {% block conteudo %}{% endblock %}
+    </div>
+
+    <script>
+        function setIconeTema() {
+            var t = document.documentElement.getAttribute('data-theme');
+            var b = document.getElementById('btnTema');
+            if (b) b.textContent = (t === 'dark') ? '☀️' : '🌙';
+        }
+        function alternarTema() {
+            var atual = document.documentElement.getAttribute('data-theme');
+            var novo = (atual === 'dark') ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', novo);
+            localStorage.setItem('tema', novo);
+            setIconeTema();
+        }
+        setIconeTema();
+    </script>
+</body>
+</html>

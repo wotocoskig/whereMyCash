@@ -1,35 +1,34 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <title>Editar Lançamento</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background-color: #f9f9f9;}
-        .container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-        button { background-color: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { background-color: #219150; }
-        .voltar { display: inline-block; margin-top: 12px; color: #3498db; text-decoration: none; }
-        .voltar:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>✏️ Editar Lançamento</h1>
+{% extends "base.html" %}
+{% block title %}Editar lançamento{% endblock %}
 
-        <form action="/editar/{{ t.id }}" method="POST">
-            <input type="text" name="descricao" value="{{ t.descricao }}" required>
-            <input type="number" step="0.01" name="valor" value="{{ "%.2f"|format(t.valor) }}" required>
-            <input type="text" name="categoria" value="{{ t.categoria }}" required>
-            <input type="date" name="data" value="{{ t.data }}" required>
-            <select name="tipo">
-                <option value="DESPESA" {% if t.tipo == 'DESPESA' %}selected{% endif %}>Despesa</option>
-                <option value="RECEITA" {% if t.tipo == 'RECEITA' %}selected{% endif %}>Receita</option>
-            </select>
-            <button type="submit">Salvar Alterações</button>
-        </form>
+{% block conteudo %}
+<div class="card" style="max-width: 420px; margin: 20px auto;">
+    <h1 style="font-size: 22px;">✏️ Editar lançamento</h1>
 
-        <a class="voltar" href="/">← Voltar sem salvar</a>
-    </div>
-</body>
-</html>
+    <form action="/editar/{{ t.id }}" method="POST">
+        <label for="descricao">Descrição</label>
+        <input type="text" id="descricao" name="descricao" value="{{ t.descricao }}" required>
+
+        <label for="valor">Valor</label>
+        <input type="number" id="valor" step="0.01" name="valor" value="{{ "%.2f"|format(t.valor) }}" required>
+
+        <label for="categoria">Categoria</label>
+        <input type="text" id="categoria" name="categoria" value="{{ t.categoria }}" required>
+
+        <label for="data">Data</label>
+        <input type="date" id="data" name="data" value="{{ t.data }}" required>
+
+        <label for="tipo">Tipo</label>
+        <select id="tipo" name="tipo">
+            <option value="DESPESA" {% if t.tipo == 'DESPESA' %}selected{% endif %}>Despesa</option>
+            <option value="RECEITA" {% if t.tipo == 'RECEITA' %}selected{% endif %}>Receita</option>
+        </select>
+
+        <button type="submit" class="btn" style="margin-top: 12px;">Salvar alterações</button>
+    </form>
+
+    <p style="text-align: center; margin-bottom: 0;">
+        <a class="link" href="/">← Voltar sem salvar</a>
+    </p>
+</div>
+{% endblock %}

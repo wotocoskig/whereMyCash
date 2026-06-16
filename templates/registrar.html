@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Criar conta — wheresMyCash{% endblock %}
+
+{% block conteudo %}
+<div class="card" style="max-width: 380px; margin: 40px auto;">
+    <h1 style="font-size: 22px;">Criar conta ✨</h1>
+    <p class="muted" style="margin-top: -8px;">Leva menos de um minuto.</p>
+
+    <form action="{{ url_for('registrar') }}" method="POST">
+        <label for="username">Usuário</label>
+        <input type="text" id="username" name="username" value="{{ username or '' }}"
+               minlength="3" required autofocus>
+
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" name="senha" minlength="4" required>
+
+        <label for="senha2">Repita a senha</label>
+        <input type="password" id="senha2" name="senha2" minlength="4" required>
+
+        <button type="submit" class="btn" style="margin-top: 12px;">Criar conta</button>
+    </form>
+
+    <p class="muted" style="text-align: center; margin-bottom: 0;">
+        Já tem conta? <a class="link" href="{{ url_for('login') }}">Entrar</a>
+    </p>
+</div>
+{% endblock %}

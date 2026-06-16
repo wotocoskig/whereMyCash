@@ -1,13 +1,37 @@
 import os
+import secrets
 import sqlite3
 from datetime import date, datetime
-from flask import Flask, render_template, request, redirect
+from functools import wraps
+
+from flask import (
+    Flask, render_template, request, redirect, session, flash, url_for
+)
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
-# Caminho absoluto do banco (funciona localmente e em servidor de hospedagem,
-# independente de qual seja o diretório de trabalho do processo).
-DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Caminho absoluto do banco (funciona local e em hospedagem, independente do cwd).
+DB = os.path.join(BASE_DIR, "database.db")
+SECRET_FILE = os.path.join(BASE_DIR, "secret_key.txt")
+
+
+def carregar_secret_key():
+    """Lê a chave de sessão de um arquivo local; cria uma aleatória na 1ª vez.
+
+    Mantida fora do Git (ver .gitignore) para não expor a chave no repositório.
+    """
+    if os.path.exists(SECRET_FILE):
+        with open(SECRET_FILE, "r") as f:
+            return f.read().strip()
+    chave = secrets.token_hex(32)
+    with open(SECRET_FILE, "w") as f:
+        f.write(chave)
+    return chave
+
+
+app.secret_key = carregar_secret_key()
 
 
 def get_db():
@@ -18,8 +42,20 @@ def get_db():
 
 
 def init_db():
-    """Cria a tabela, faz migração da coluna 'data' e popula exemplos na 1ª vez."""
+    """Cria/atualiza as tabelas. Idempotente — pode rodar a cada importação."""
     conn = get_db()
+
+    # Usuários
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            username  TEXT    NOT NULL UNIQUE,
+            senha_hash TEXT   NOT NULL,
+            criado_em TEXT    NOT NULL
+        )
+    """)
+
+    # Transações
     conn.execute("""
         CREATE TABLE IF NOT EXISTS transacoes (
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,34 +66,119 @@ def init_db():
         )
     """)
 
-    # Migração: adiciona a coluna 'data' se ainda não existir (bancos antigos)
+    # Migrações de colunas adicionadas ao longo do tempo
     colunas = [c["name"] for c in conn.execute("PRAGMA table_info(transacoes)")]
     if "data" not in colunas:
         conn.execute("ALTER TABLE transacoes ADD COLUMN data TEXT")
-        # Lançamentos antigos sem data recebem a data de hoje
         conn.execute(
             "UPDATE transacoes SET data = ? WHERE data IS NULL",
             (date.today().isoformat(),),
         )
-
-    # Se a tabela estiver vazia, insere as transações de exemplo (seed inicial)
-    total = conn.execute("SELECT COUNT(*) FROM transacoes").fetchone()[0]
-    if total == 0:
-        hoje = date.today().isoformat()
-        exemplos = [
-            ("Salário", 3000.00, "RECEITA", "Renda", hoje),
-            ("Mercado", 500.00, "DESPESA", "Alimentação", hoje),
-            ("Ifood", 80.00, "DESPESA", "Alimentação", hoje),
-            ("Cinema", 60.00, "DESPESA", "Lazer", hoje),
-        ]
-        conn.executemany(
-            "INSERT INTO transacoes (descricao, valor, tipo, categoria, data) "
-            "VALUES (?, ?, ?, ?, ?)",
-            exemplos,
-        )
+    if "usuario_id" not in colunas:
+        # Liga cada transação ao seu dono. Linhas antigas ficam sem dono (NULL)
+        # e são adotadas pelo primeiro usuário que se cadastrar (ver /registrar).
+        conn.execute("ALTER TABLE transacoes ADD COLUMN usuario_id INTEGER")
 
     conn.commit()
     conn.close()
+
+
+# ---- Autenticação ----
+
+def login_required(f):
+    """Protege rotas: sem sessão, manda pro login."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if "usuario_id" not in session:
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return wrapper
+
+
+@app.route('/registrar', methods=['GET', 'POST'])
+def registrar():
+    if "usuario_id" in session:
+        return redirect('/')
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        senha = request.form.get('senha', '')
+        senha2 = request.form.get('senha2', '')
+
+        if len(username) < 3:
+            flash("O nome de usuário precisa ter pelo menos 3 caracteres.", "erro")
+            return render_template('registrar.html', username=username)
+        if len(senha) < 4:
+            flash("A senha precisa ter pelo menos 4 caracteres.", "erro")
+            return render_template('registrar.html', username=username)
+        if senha != senha2:
+            flash("As senhas não conferem.", "erro")
+            return render_template('registrar.html', username=username)
+
+        conn = get_db()
+        existe = conn.execute(
+            "SELECT 1 FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        if existe:
+            conn.close()
+            flash("Esse nome de usuário já está em uso.", "erro")
+            return render_template('registrar.html', username=username)
+
+        cur = conn.execute(
+            "INSERT INTO users (username, senha_hash, criado_em) VALUES (?, ?, ?)",
+            (username, generate_password_hash(senha), date.today().isoformat()),
+        )
+        novo_id = cur.lastrowid
+
+        # Se for o primeiro usuário, adota transações antigas que não tinham dono.
+        total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        if total_users == 1:
+            conn.execute(
+                "UPDATE transacoes SET usuario_id = ? WHERE usuario_id IS NULL",
+                (novo_id,),
+            )
+
+        conn.commit()
+        conn.close()
+
+        session['usuario_id'] = novo_id
+        session['usuario_nome'] = username
+        flash("Conta criada com sucesso! Bem-vindo(a). 🎉", "ok")
+        return redirect('/')
+
+    return render_template('registrar.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if "usuario_id" in session:
+        return redirect('/')
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        senha = request.form.get('senha', '')
+
+        conn = get_db()
+        user = conn.execute(
+            "SELECT * FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        conn.close()
+
+        if user is None or not check_password_hash(user["senha_hash"], senha):
+            flash("Usuário ou senha inválidos.", "erro")
+            return render_template('login.html', username=username)
+
+        session['usuario_id'] = user["id"]
+        session['usuario_nome'] = user["username"]
+        return redirect('/')
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 
 # ---- Filtros de template (formatação amigável) ----
@@ -89,40 +210,40 @@ def mes_br(aaaa_mm):
         return aaaa_mm
 
 
+# ---- Rotas principais (todas exigem login) ----
+
 @app.route('/')
+@login_required
 def index():
     mes_sel = request.args.get('mes', 'todos')
+    uid = session['usuario_id']
 
     conn = get_db()
     todas = conn.execute(
-        "SELECT * FROM transacoes ORDER BY data DESC, id DESC"
+        "SELECT * FROM transacoes WHERE usuario_id = ? ORDER BY data DESC, id DESC",
+        (uid,),
     ).fetchall()
     conn.close()
 
-    # Lista de meses disponíveis (AAAA-MM) para o filtro, do mais recente ao mais antigo
+    # Meses disponíveis para o filtro (do mais recente ao mais antigo)
     meses = sorted({t["data"][:7] for t in todas if t["data"]}, reverse=True)
 
-    # Aplica o filtro de mês (se não for "todos")
     if mes_sel != 'todos':
         transacoes = [t for t in todas if t["data"] and t["data"].startswith(mes_sel)]
     else:
         transacoes = todas
 
-    # 1. Saldo do período exibido
-    saldo = sum(
-        t["valor"] if t["tipo"] == "RECEITA" else -t["valor"]
-        for t in transacoes
-    )
+    total_receitas = sum(t["valor"] for t in transacoes if t["tipo"] == "RECEITA")
+    total_despesas = sum(t["valor"] for t in transacoes if t["tipo"] == "DESPESA")
+    saldo = total_receitas - total_despesas
 
-    # 2. Gastos por categoria (só DESPESA)
+    # Gastos por categoria (só DESPESA) para o gráfico
     gastos = {}
     for t in transacoes:
         if t["tipo"] == "DESPESA":
             gastos[t["categoria"]] = gastos.get(t["categoria"], 0) + t["valor"]
 
-    # Prepara dados do gráfico: lista ordenada com percentual relativo ao maior gasto
     maior = max(gastos.values()) if gastos else 0
-    total_despesas = sum(gastos.values())
     resumo = [
         {
             "categoria": cat,
@@ -137,6 +258,8 @@ def index():
         'index.html',
         transacoes=transacoes,
         saldo=saldo,
+        total_receitas=total_receitas,
+        total_despesas=total_despesas,
         resumo=resumo,
         meses=meses,
         mes_sel=mes_sel,
@@ -145,6 +268,7 @@ def index():
 
 
 @app.route('/adicionar', methods=['POST'])
+@login_required
 def adicionar():
     descricao = request.form['descricao']
     valor = float(request.form['valor'])
@@ -154,9 +278,9 @@ def adicionar():
 
     conn = get_db()
     conn.execute(
-        "INSERT INTO transacoes (descricao, valor, tipo, categoria, data) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (descricao, valor, tipo, categoria, data_lanc),
+        "INSERT INTO transacoes (descricao, valor, tipo, categoria, data, usuario_id) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (descricao, valor, tipo, categoria, data_lanc, session['usuario_id']),
     )
     conn.commit()
     conn.close()
@@ -165,23 +289,29 @@ def adicionar():
 
 
 @app.route('/excluir/<int:id>', methods=['POST'])
+@login_required
 def excluir(id):
     conn = get_db()
-    conn.execute("DELETE FROM transacoes WHERE id = ?", (id,))
+    # O filtro por usuario_id impede excluir transação de outra pessoa.
+    conn.execute(
+        "DELETE FROM transacoes WHERE id = ? AND usuario_id = ?",
+        (id, session['usuario_id']),
+    )
     conn.commit()
     conn.close()
     return redirect('/')
 
 
 @app.route('/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
 def editar(id):
     conn = get_db()
+    uid = session['usuario_id']
 
-    # POST: salva as alterações
     if request.method == 'POST':
         conn.execute(
             "UPDATE transacoes SET descricao = ?, valor = ?, tipo = ?, "
-            "categoria = ?, data = ? WHERE id = ?",
+            "categoria = ?, data = ? WHERE id = ? AND usuario_id = ?",
             (
                 request.form['descricao'],
                 float(request.form['valor']),
@@ -189,15 +319,15 @@ def editar(id):
                 request.form['categoria'],
                 request.form.get('data') or date.today().isoformat(),
                 id,
+                uid,
             ),
         )
         conn.commit()
         conn.close()
         return redirect('/')
 
-    # GET: mostra o formulário pré-preenchido
     transacao = conn.execute(
-        "SELECT * FROM transacoes WHERE id = ?", (id,)
+        "SELECT * FROM transacoes WHERE id = ? AND usuario_id = ?", (id, uid)
     ).fetchone()
     conn.close()
 
@@ -207,8 +337,7 @@ def editar(id):
     return render_template('editar.html', t=transacao)
 
 
-# Garante que o banco/tabela existam assim que o módulo é importado.
-# Necessário em servidores de produção (WSGI), onde o bloco __main__ não roda.
+# Garante que as tabelas existam assim que o módulo é importado (produção/WSGI).
 init_db()
 
 

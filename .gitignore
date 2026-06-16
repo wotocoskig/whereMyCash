@@ -1,6 +1,9 @@
 # Banco de dados local (dados pessoais — não versionar)
 database.db
 
+# Chave secreta das sessões (gerada localmente — nunca versionar)
+secret_key.txt
+
 # Cache do Python
 __pycache__/
 *.pyc
