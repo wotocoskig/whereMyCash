@@ -23,7 +23,13 @@
         <input type="number" id="valor" step="0.01" name="valor" value="{{ "%.2f"|format(t.valor) }}" required>
 
         <label for="categoria">Categoria</label>
-        <input type="text" id="categoria" name="categoria" value="{{ t.categoria }}" required>
+        <input type="text" id="categoria" name="categoria" value="{{ t.categoria }}"
+               list="lista-categorias" required>
+        <datalist id="lista-categorias">
+            {% for c in categorias %}
+                <option value="{{ c }}"></option>
+            {% endfor %}
+        </datalist>
 
         <label for="detalhes">Detalhes (opcional)</label>
         <textarea id="detalhes" name="detalhes" rows="2" placeholder="O que você comprou?">{{ t.detalhes or '' }}</textarea>

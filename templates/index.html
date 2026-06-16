@@ -54,36 +54,18 @@
         <div class="stat">
             <div class="rotulo">Saldo</div>
             <div class="num" style="color: {% if saldo >= 0 %}var(--receita){% else %}var(--despesa){% endif %};">
-                R$ {{ "%.2f"|format(saldo) }}
+                R$ {{ saldo|moeda }}
             </div>
         </div>
         <div class="stat">
             <div class="rotulo">Ganhos</div>
-            <div class="num receita">R$ {{ "%.2f"|format(total_receitas) }}</div>
+            <div class="num receita">R$ {{ total_receitas|moeda }}</div>
         </div>
         <div class="stat">
             <div class="rotulo">Gastos</div>
-            <div class="num despesa">R$ {{ "%.2f"|format(total_despesas) }}</div>
+            <div class="num despesa">R$ {{ total_despesas|moeda }}</div>
         </div>
     </div>
-
-    <!-- Status de pagamento dos gastos -->
-    {% if total_despesas > 0 %}
-    <div class="card">
-        <h3>💳 Pagamentos do período</h3>
-        <div class="pagto-linha">
-            <span>✅ Já pago (débito)</span>
-            <strong class="receita">R$ {{ "%.2f"|format(total_pago) }}</strong>
-        </div>
-        <div class="barra-trilho" style="margin: 8px 0 14px;">
-            <div class="barra-paga" style="width: {{ pct_pago }}%;"></div>
-        </div>
-        <div class="pagto-linha">
-            <span>⏳ Falta pagar (crédito)</span>
-            <strong class="despesa">R$ {{ "%.2f"|format(total_a_pagar) }}</strong>
-        </div>
-    </div>
-    {% endif %}
 
     <!-- Nova transação -->
     <div class="card">
@@ -99,7 +81,13 @@
 
             <input type="text" name="descricao" placeholder="Descrição (ex: Mercado)" required>
             <input type="number" step="0.01" name="valor" placeholder="Valor (ex: 50.00)" required>
-            <input type="text" name="categoria" placeholder="Categoria (ex: Lazer, Casa, Transporte)" required>
+            <input type="text" name="categoria" list="lista-categorias"
+                   placeholder="Categoria (digite ou escolha a sua)" required>
+            <datalist id="lista-categorias">
+                {% for c in categorias %}
+                    <option value="{{ c }}"></option>
+                {% endfor %}
+            </datalist>
             <textarea name="detalhes" rows="2" placeholder="Detalhes (opcional) — o que você comprou?"></textarea>
             <input type="date" name="data" value="{{ hoje }}" required>
             <select name="forma" id="forma">
@@ -109,6 +97,24 @@
             <button type="submit" class="btn">Salvar lançamento</button>
         </form>
     </div>
+
+    <!-- Status de pagamento dos gastos -->
+    {% if total_despesas > 0 %}
+    <div class="card">
+        <h3>💳 Pagamentos do período</h3>
+        <div class="pagto-linha">
+            <span>✅ Já pago (débito)</span>
+            <strong class="receita">R$ {{ total_pago|moeda }}</strong>
+        </div>
+        <div class="barra-trilho" style="margin: 8px 0 14px;">
+            <div class="barra-paga" style="width: {{ pct_pago }}%;"></div>
+        </div>
+        <div class="pagto-linha">
+            <span>⏳ Falta pagar (crédito)</span>
+            <strong class="despesa">R$ {{ total_a_pagar|moeda }}</strong>
+        </div>
+    </div>
+    {% endif %}
 
     <script>
         // Mostra a forma de pagamento só quando o lançamento é um Gasto.
@@ -128,7 +134,7 @@
                     <li>
                         <div class="barra-topo">
                             <strong>{{ r.categoria }}</strong>
-                            <span class="muted">R$ {{ "%.2f"|format(r.total) }} ({{ "%.0f"|format(r.pct_total) }}%)</span>
+                            <span class="muted">R$ {{ r.total|moeda }} ({{ "%.0f"|format(r.pct_total) }}%)</span>
                         </div>
                         <div class="barra-trilho">
                             <div class="barra-preenchida" style="width: {{ r.pct_barra }}%;"></div>
@@ -149,7 +155,7 @@
                 <li>
                     <span class="info">
                         <span class="desc">{{ t.descricao }}</span>
-                        <span class="{{ t.tipo|lower }}">R$ {{ "%.2f"|format(t.valor) }}</span>
+                        <span class="{{ t.tipo|lower }}">R$ {{ t.valor|moeda }}</span>
                         {% if t.tipo == 'DESPESA' and t.forma == 'CREDITO' %}
                             <span class="tag tag-credito">crédito</span>
                         {% elif t.tipo == 'DESPESA' %}

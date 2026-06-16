@@ -37,7 +37,15 @@ Tabela `transacoes`:
 
 **UI:** "Ganho"/"Gasto" são só rótulos de tela; no banco continuam `RECEITA`/`DESPESA`.
 A home mostra "Já pago" (débito + NULL) vs "Falta pagar" (crédito) do período, pra
-fechar o mês. O campo de forma só aparece quando o tipo é Gasto.
+fechar o mês. O campo de forma só aparece quando o tipo é Gasto. O seletor de tipo
+são dois botões (radio estilizado), CSS em `base.html`.
+
+**Categoria:** campo de texto livre com `<datalist>` das categorias que o próprio
+usuário já usou (lista personalizada auto-construída) — passado como `categorias`
+pelas rotas `/` e `/editar`. Descrição = livre (item); detalhes = nota opcional.
+
+**Dinheiro:** filtro `|moeda` formata no padrão BR (1.000.000,00). Usar SEMPRE nos
+valores exibidos. Inputs `type=number` continuam com ponto (sem separador).
 
 Toda query de transação é filtrada por `usuario_id = session['usuario_id']`
 (inclui edição/exclusão, pra ninguém mexer no dado do outro). Migrações de coluna

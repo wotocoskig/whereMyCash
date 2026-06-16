@@ -218,6 +218,17 @@ def mes_br(aaaa_mm):
         return aaaa_mm
 
 
+@app.template_filter("moeda")
+def moeda(valor):
+    """Formata número no padrão brasileiro: 1000000 -> '1.000.000,00'."""
+    try:
+        v = float(valor)
+    except (TypeError, ValueError):
+        v = 0.0
+    # f"{v:,.2f}" usa padrão US (1,000,000.00); troca-se ',' e '.' para pt-BR.
+    return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 # ---- Rotas principais (todas exigem login) ----
 
 @app.route('/')
@@ -235,6 +246,9 @@ def index():
 
     # Meses disponíveis para o filtro (do mais recente ao mais antigo)
     meses = sorted({t["data"][:7] for t in todas if t["data"]}, reverse=True)
+
+    # Lista personalizada de categorias: as que o próprio usuário já usou.
+    categorias = sorted({t["categoria"] for t in todas if t["categoria"]}, key=str.lower)
 
     if mes_sel != 'todos':
         transacoes = [t for t in todas if t["data"] and t["data"].startswith(mes_sel)]
@@ -282,6 +296,7 @@ def index():
         pct_pago=pct_pago,
         resumo=resumo,
         meses=meses,
+        categorias=categorias,
         mes_sel=mes_sel,
         hoje=date.today().isoformat(),
     )
@@ -357,12 +372,18 @@ def editar(id):
     transacao = conn.execute(
         "SELECT * FROM transacoes WHERE id = ? AND usuario_id = ?", (id, uid)
     ).fetchone()
+    cats = conn.execute(
+        "SELECT DISTINCT categoria FROM transacoes "
+        "WHERE usuario_id = ? AND categoria <> '' ORDER BY categoria COLLATE NOCASE",
+        (uid,),
+    ).fetchall()
     conn.close()
 
     if transacao is None:
         return redirect('/')
 
-    return render_template('editar.html', t=transacao)
+    categorias = [c["categoria"] for c in cats]
+    return render_template('editar.html', t=transacao, categorias=categorias)
 
 
 # Garante que as tabelas existam assim que o módulo é importado (produção/WSGI).
