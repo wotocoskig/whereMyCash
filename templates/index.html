@@ -31,6 +31,12 @@
         .btn-acao { padding: 7px 12px; font-size: 13px; border-radius: 9px; text-decoration: none; display: inline-block; width: auto; margin: 0; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); cursor: pointer; }
         .btn-acao:hover { border-color: var(--accent); }
         .vazio { color: var(--muted); font-style: italic; }
+        .busca { margin-bottom: 14px; }
+        .busca input, .busca select { margin: 4px 0; }
+        .busca-linha { display: flex; gap: 8px; }
+        .busca-linha select { flex: 1; }
+        .busca-linha .btn { width: auto; flex-shrink: 0; }
+        .limpar { display: inline-block; margin-top: 6px; font-size: 13px; }
         @media (max-width: 480px) {
             .stat .num { font-size: 16px; }
             .stat .rotulo { font-size: 10px; }
@@ -150,6 +156,30 @@
     <!-- Extrato -->
     <div class="card">
         <h3>🧾 Extrato {% if mes_sel != 'todos' %}— {{ mes_sel|mes_br }}{% endif %}</h3>
+
+        <!-- Busca e filtros do extrato -->
+        <form class="busca" method="GET" action="/">
+            <input type="hidden" name="mes" value="{{ mes_sel }}">
+            <input type="text" name="q" value="{{ q }}" placeholder="🔍 Buscar (descrição, categoria, detalhes)">
+            <div class="busca-linha">
+                <select name="cat">
+                    <option value="">Todas as categorias</option>
+                    {% for c in categorias %}
+                        <option value="{{ c }}" {% if cat_sel == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+                <select name="forma">
+                    <option value="">Crédito e débito</option>
+                    <option value="CREDITO" {% if forma_sel == 'CREDITO' %}selected{% endif %}>Só crédito</option>
+                    <option value="DEBITO" {% if forma_sel == 'DEBITO' %}selected{% endif %}>Só débito</option>
+                </select>
+                <button type="submit" class="btn">Filtrar</button>
+            </div>
+            {% if q or cat_sel or forma_sel %}
+                <a class="link limpar" href="/?mes={{ mes_sel }}">✕ Limpar filtros</a>
+            {% endif %}
+        </form>
+
         <ul class="extrato">
             {% for t in transacoes %}
                 <li>
@@ -175,7 +205,11 @@
                     </span>
                 </li>
             {% else %}
-                <li class="vazio">Nenhum lançamento ainda. Adicione o primeiro acima! 👆</li>
+                {% if q or cat_sel or forma_sel %}
+                    <li class="vazio">Nenhum lançamento encontrado para esse filtro.</li>
+                {% else %}
+                    <li class="vazio">Nenhum lançamento ainda. Adicione o primeiro acima! 👆</li>
+                {% endif %}
             {% endfor %}
         </ul>
     </div>

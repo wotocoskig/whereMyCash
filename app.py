@@ -250,19 +250,20 @@ def index():
     # Lista personalizada de categorias: as que o próprio usuário já usou.
     categorias = sorted({t["categoria"] for t in todas if t["categoria"]}, key=str.lower)
 
+    # Recorte do mês: alimenta os cards de resumo, o gráfico e o status de pagamento.
     if mes_sel != 'todos':
-        transacoes = [t for t in todas if t["data"] and t["data"].startswith(mes_sel)]
+        tx_mes = [t for t in todas if t["data"] and t["data"].startswith(mes_sel)]
     else:
-        transacoes = todas
+        tx_mes = todas
 
-    total_receitas = sum(t["valor"] for t in transacoes if t["tipo"] == "RECEITA")
-    total_despesas = sum(t["valor"] for t in transacoes if t["tipo"] == "DESPESA")
+    total_receitas = sum(t["valor"] for t in tx_mes if t["tipo"] == "RECEITA")
+    total_despesas = sum(t["valor"] for t in tx_mes if t["tipo"] == "DESPESA")
     saldo = total_receitas - total_despesas
 
     # Status de pagamento dos gastos: crédito = ainda a pagar; o resto já foi pago
     # (débito ou lançamentos antigos sem forma definida).
     total_a_pagar = sum(
-        t["valor"] for t in transacoes
+        t["valor"] for t in tx_mes
         if t["tipo"] == "DESPESA" and t["forma"] == "CREDITO"
     )
     total_pago = total_despesas - total_a_pagar
@@ -270,7 +271,7 @@ def index():
 
     # Gastos por categoria (só DESPESA) para o gráfico
     gastos = {}
-    for t in transacoes:
+    for t in tx_mes:
         if t["tipo"] == "DESPESA":
             gastos[t["categoria"]] = gastos.get(t["categoria"], 0) + t["valor"]
 
@@ -285,9 +286,32 @@ def index():
         for cat, total in sorted(gastos.items(), key=lambda x: x[1], reverse=True)
     ]
 
+    # Extrato: parte do recorte do mês e aplica busca + filtros de categoria/forma.
+    q = request.args.get('q', '').strip()
+    cat_sel = request.args.get('cat', '')
+    forma_sel = request.args.get('forma', '')
+
+    extrato = tx_mes
+    if cat_sel:
+        extrato = [t for t in extrato if t["categoria"] == cat_sel]
+    if forma_sel in ('CREDITO', 'DEBITO'):
+        extrato = [
+            t for t in extrato
+            if t["tipo"] == "DESPESA"
+            and (t["forma"] or "DEBITO") == forma_sel
+        ]
+    if q:
+        termo = q.lower()
+        extrato = [
+            t for t in extrato
+            if termo in (t["descricao"] or "").lower()
+            or termo in (t["categoria"] or "").lower()
+            or termo in (t["detalhes"] or "").lower()
+        ]
+
     return render_template(
         'index.html',
-        transacoes=transacoes,
+        transacoes=extrato,
         saldo=saldo,
         total_receitas=total_receitas,
         total_despesas=total_despesas,
@@ -298,6 +322,9 @@ def index():
         meses=meses,
         categorias=categorias,
         mes_sel=mes_sel,
+        q=q,
+        cat_sel=cat_sel,
+        forma_sel=forma_sel,
         hoje=date.today().isoformat(),
     )
 
