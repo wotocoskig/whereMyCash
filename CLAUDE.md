@@ -37,4 +37,12 @@ Tabela `transacoes`:
 1. [x] Persistência com SQLite (feito)
 2. [x] Editar / excluir transações (feito — rotas /editar/<id> e /excluir/<id>, tela editar.html)
 3. [x] Visual e relatórios (feito — gráfico de barras por categoria + filtro por mês; coluna `data` adicionada)
-4. [ ] Acessar pelo celular (hospedagem)
+4. [x] Acessar pelo celular (feito — hospedado no PythonAnywhere)
+
+## Produção
+- **No ar em:** https://gustavoaw.pythonanywhere.com (PythonAnywhere, plano grátis)
+- Passo a passo completo em `DEPLOY.md`.
+- **Atualizar o site após mexer no código:** no console Bash do PythonAnywhere,
+  `cd whereMyCash && git pull`, depois **Reload** na aba Web.
+- O `database.db` de produção é separado do local — fica no servidor.
+- Plano grátis: clicar em "Run until 3 months from today" na aba Web a cada ~3 meses.
