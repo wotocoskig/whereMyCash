@@ -30,6 +30,12 @@ Tabela `transacoes`:
 - `categoria` TEXT
 - `data` TEXT (`AAAA-MM-DD`)
 - `usuario_id` INTEGER → dono da transação (FK lógica para `users.id`)
+- `forma` TEXT → só para GASTOS: `CREDITO` (a pagar, cai na fatura) ou `DEBITO`
+  (já pago). Ganhos e dados antigos ficam NULL = tratados como "já pago".
+
+**UI:** "Ganho"/"Gasto" são só rótulos de tela; no banco continuam `RECEITA`/`DESPESA`.
+A home mostra "Já pago" (débito + NULL) vs "Falta pagar" (crédito) do período, pra
+fechar o mês. O campo de forma só aparece quando o tipo é Gasto.
 
 Toda query de transação é filtrada por `usuario_id = session['usuario_id']`
 (inclui edição/exclusão, pra ninguém mexer no dado do outro). Migrações de coluna

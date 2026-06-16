@@ -78,6 +78,11 @@ def init_db():
         # Liga cada transação ao seu dono. Linhas antigas ficam sem dono (NULL)
         # e são adotadas pelo primeiro usuário que se cadastrar (ver /registrar).
         conn.execute("ALTER TABLE transacoes ADD COLUMN usuario_id INTEGER")
+    if "forma" not in colunas:
+        # Forma de pagamento dos GASTOS: 'CREDITO' (cai na fatura, ainda a pagar)
+        # ou 'DEBITO' (já saiu da conta). Ganhos e dados antigos ficam NULL,
+        # tratados como "já pago / à vista".
+        conn.execute("ALTER TABLE transacoes ADD COLUMN forma TEXT")
 
     conn.commit()
     conn.close()
@@ -237,6 +242,15 @@ def index():
     total_despesas = sum(t["valor"] for t in transacoes if t["tipo"] == "DESPESA")
     saldo = total_receitas - total_despesas
 
+    # Status de pagamento dos gastos: crédito = ainda a pagar; o resto já foi pago
+    # (débito ou lançamentos antigos sem forma definida).
+    total_a_pagar = sum(
+        t["valor"] for t in transacoes
+        if t["tipo"] == "DESPESA" and t["forma"] == "CREDITO"
+    )
+    total_pago = total_despesas - total_a_pagar
+    pct_pago = (total_pago / total_despesas * 100) if total_despesas else 0
+
     # Gastos por categoria (só DESPESA) para o gráfico
     gastos = {}
     for t in transacoes:
@@ -260,6 +274,9 @@ def index():
         saldo=saldo,
         total_receitas=total_receitas,
         total_despesas=total_despesas,
+        total_a_pagar=total_a_pagar,
+        total_pago=total_pago,
+        pct_pago=pct_pago,
         resumo=resumo,
         meses=meses,
         mes_sel=mes_sel,
@@ -275,12 +292,14 @@ def adicionar():
     tipo = request.form['tipo']
     categoria = request.form['categoria']
     data_lanc = request.form.get('data') or date.today().isoformat()
+    # Forma de pagamento só faz sentido para gastos; ganhos ficam NULL.
+    forma = request.form.get('forma') if tipo == 'DESPESA' else None
 
     conn = get_db()
     conn.execute(
-        "INSERT INTO transacoes (descricao, valor, tipo, categoria, data, usuario_id) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (descricao, valor, tipo, categoria, data_lanc, session['usuario_id']),
+        "INSERT INTO transacoes (descricao, valor, tipo, categoria, data, forma, usuario_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (descricao, valor, tipo, categoria, data_lanc, forma, session['usuario_id']),
     )
     conn.commit()
     conn.close()
@@ -309,15 +328,18 @@ def editar(id):
     uid = session['usuario_id']
 
     if request.method == 'POST':
+        tipo = request.form['tipo']
+        forma = request.form.get('forma') if tipo == 'DESPESA' else None
         conn.execute(
             "UPDATE transacoes SET descricao = ?, valor = ?, tipo = ?, "
-            "categoria = ?, data = ? WHERE id = ? AND usuario_id = ?",
+            "categoria = ?, data = ?, forma = ? WHERE id = ? AND usuario_id = ?",
             (
                 request.form['descricao'],
                 float(request.form['valor']),
-                request.form['tipo'],
+                tipo,
                 request.form['categoria'],
                 request.form.get('data') or date.today().isoformat(),
+                forma,
                 id,
                 uid,
             ),

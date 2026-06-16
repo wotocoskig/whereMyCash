@@ -19,10 +19,18 @@
         <input type="date" id="data" name="data" value="{{ t.data }}" required>
 
         <label for="tipo">Tipo</label>
-        <select id="tipo" name="tipo">
-            <option value="DESPESA" {% if t.tipo == 'DESPESA' %}selected{% endif %}>Despesa</option>
-            <option value="RECEITA" {% if t.tipo == 'RECEITA' %}selected{% endif %}>Receita</option>
+        <select id="tipo" name="tipo" onchange="toggleForma()">
+            <option value="DESPESA" {% if t.tipo == 'DESPESA' %}selected{% endif %}>Gasto</option>
+            <option value="RECEITA" {% if t.tipo == 'RECEITA' %}selected{% endif %}>Ganho</option>
         </select>
+
+        <div id="campoForma">
+            <label for="forma">Forma de pagamento</label>
+            <select id="forma" name="forma">
+                <option value="DEBITO" {% if t.forma != 'CREDITO' %}selected{% endif %}>Débito (já pago)</option>
+                <option value="CREDITO" {% if t.forma == 'CREDITO' %}selected{% endif %}>Crédito (a pagar)</option>
+            </select>
+        </div>
 
         <button type="submit" class="btn" style="margin-top: 12px;">Salvar alterações</button>
     </form>
@@ -31,4 +39,13 @@
         <a class="link" href="/">← Voltar sem salvar</a>
     </p>
 </div>
+
+<script>
+    // Mostra a forma de pagamento só quando o tipo é Gasto.
+    function toggleForma() {
+        var tipo = document.getElementById('tipo').value;
+        document.getElementById('campoForma').style.display = (tipo === 'DESPESA') ? 'block' : 'none';
+    }
+    toggleForma();
+</script>
 {% endblock %}
