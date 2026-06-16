@@ -1,0 +1,10 @@
+# Banco de dados local (dados pessoais — não versionar)
+database.db
+
+# Cache do Python
+__pycache__/
+*.pyc
+
+# Ambiente virtual
+venv/
+.venv/

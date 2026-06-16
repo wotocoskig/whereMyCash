@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meu Controle Financeiro</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background-color: #f9f9f9;}
@@ -13,20 +14,56 @@
         button { background-color: #3498db; color: white; border: none; cursor: pointer; font-weight: bold; }
         button:hover { background-color: #2980b9; }
         .resumo-box { background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin-top: 20px;}
+        .filtro { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+        .filtro label { font-weight: bold; white-space: nowrap; }
+        .filtro select { margin: 0; }
+        /* Gráfico de barras de gastos por categoria */
+        .grafico { list-style: none; padding: 0; margin: 0; }
+        .grafico li { margin-bottom: 10px; }
+        .barra-topo { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 2px; }
+        .barra-trilho { background-color: #dfe6e9; border-radius: 4px; overflow: hidden; height: 18px; }
+        .barra-preenchida { background-color: #e74c3c; height: 100%; border-radius: 4px; }
+        .extrato { list-style: none; padding: 0; }
+        .extrato li { display: flex; align-items: center; justify-content: space-between;
+                      padding: 8px 0; border-bottom: 1px solid #eee; gap: 8px; }
+        .extrato .info { flex: 1; }
+        .extrato .data { color: #95a5a6; font-size: 12px; }
+        .acoes { display: flex; gap: 6px; }
+        .acoes form, .acoes a { margin: 0; width: auto; }
+        .btn-acao { padding: 4px 10px; font-size: 13px; border-radius: 4px;
+                    text-decoration: none; display: inline-block; line-height: 1.6; }
+        .btn-editar { background-color: #f39c12; color: white; }
+        .btn-editar:hover { background-color: #e67e22; }
+        .btn-excluir { background-color: #c0392b; color: white; }
+        .btn-excluir:hover { background-color: #a93226; }
+        .vazio { color: #95a5a6; font-style: italic; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Controle de Gastos 💰</h1>
-        <p class="saldo">Saldo Atual: R$ {{ "%.2f"|format(saldo) }}</p>
-        
+
+        <!-- Filtro por mês -->
+        <form class="filtro" method="GET" action="/">
+            <label for="mes">Período:</label>
+            <select name="mes" id="mes" onchange="this.form.submit()">
+                <option value="todos" {% if mes_sel == 'todos' %}selected{% endif %}>Todos os meses</option>
+                {% for m in meses %}
+                    <option value="{{ m }}" {% if mes_sel == m %}selected{% endif %}>{{ m|mes_br }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        <p class="saldo">Saldo{% if mes_sel != 'todos' %} de {{ mes_sel|mes_br }}{% endif %}: R$ {{ "%.2f"|format(saldo) }}</p>
+
         <hr>
-        
+
         <h3>Nova Transação</h3>
         <form action="/adicionar" method="POST">
             <input type="text" name="descricao" placeholder="Onde você gastou?" required>
             <input type="number" step="0.01" name="valor" placeholder="Valor (ex: 50.00)" required>
             <input type="text" name="categoria" placeholder="Categoria (ex: Lazer, Casa, Transporte)" required>
+            <input type="date" name="data" value="{{ hoje }}" required>
             <select name="tipo">
                 <option value="DESPESA">Despesa</option>
                 <option value="RECEITA">Receita</option>
@@ -36,24 +73,48 @@
 
         <div class="resumo-box">
             <h3>📊 Onde seu dinheiro está indo:</h3>
-            <ul>
-                {% for cat, total in resumo.items() %}
-                    <li><strong>{{ cat }}:</strong> R$ {{ "%.2f"|format(total) }}</li>
-                {% endfor %}
-            </ul>
+            {% if resumo %}
+                <ul class="grafico">
+                    {% for r in resumo %}
+                        <li>
+                            <div class="barra-topo">
+                                <strong>{{ r.categoria }}</strong>
+                                <span>R$ {{ "%.2f"|format(r.total) }} ({{ "%.0f"|format(r.pct_total) }}%)</span>
+                            </div>
+                            <div class="barra-trilho">
+                                <div class="barra-preenchida" style="width: {{ r.pct_barra }}%;"></div>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="vazio">Nenhuma despesa neste período.</p>
+            {% endif %}
         </div>
 
         <hr>
 
-        <h3>Extrato Completo</h3>
-        <ul>
+        <h3>Extrato {% if mes_sel != 'todos' %}({{ mes_sel|mes_br }}){% else %}Completo{% endif %}</h3>
+        <ul class="extrato">
             {% for t in transacoes %}
                 <li>
-                    {{ t.descricao }} ({{ t.categoria }}) - 
-                    <span class="{{ t.tipo|lower }}">
-                        R$ {{ "%.2f"|format(t.valor) }}
+                    <span class="info">
+                        <span class="data">{{ t.data|data_br }}</span><br>
+                        {{ t.descricao }} ({{ t.categoria }}) -
+                        <span class="{{ t.tipo|lower }}">
+                            R$ {{ "%.2f"|format(t.valor) }}
+                        </span>
+                    </span>
+                    <span class="acoes">
+                        <a class="btn-acao btn-editar" href="/editar/{{ t.id }}">Editar</a>
+                        <form action="/excluir/{{ t.id }}" method="POST"
+                              onsubmit="return confirm('Excluir este lançamento?');">
+                            <button type="submit" class="btn-acao btn-excluir">Excluir</button>
+                        </form>
                     </span>
                 </li>
+            {% else %}
+                <li class="vazio">Nenhum lançamento neste período.</li>
             {% endfor %}
         </ul>
     </div>
