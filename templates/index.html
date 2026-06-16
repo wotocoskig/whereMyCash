@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Meu Controle Financeiro</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background-color: #f9f9f9;}
+        .container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .saldo { font-size: 24px; font-weight: bold; color: #2c3e50; }
+        .receita { color: #27ae60; font-weight: bold; }
+        .despesa { color: #c0392b; font-weight: bold; }
+        input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        button { background-color: #3498db; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #2980b9; }
+        .resumo-box { background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin-top: 20px;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Controle de Gastos 💰</h1>
+        <p class="saldo">Saldo Atual: R$ {{ "%.2f"|format(saldo) }}</p>
+        
+        <hr>
+        
+        <h3>Nova Transação</h3>
+        <form action="/adicionar" method="POST">
+            <input type="text" name="descricao" placeholder="Onde você gastou?" required>
+            <input type="number" step="0.01" name="valor" placeholder="Valor (ex: 50.00)" required>
+            <input type="text" name="categoria" placeholder="Categoria (ex: Lazer, Casa, Transporte)" required>
+            <select name="tipo">
+                <option value="DESPESA">Despesa</option>
+                <option value="RECEITA">Receita</option>
+            </select>
+            <button type="submit">Salvar Lançamento</button>
+        </form>
+
+        <div class="resumo-box">
+            <h3>📊 Onde seu dinheiro está indo:</h3>
+            <ul>
+                {% for cat, total in resumo.items() %}
+                    <li><strong>{{ cat }}:</strong> R$ {{ "%.2f"|format(total) }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <hr>
+
+        <h3>Extrato Completo</h3>
+        <ul>
+            {% for t in transacoes %}
+                <li>
+                    {{ t.descricao }} ({{ t.categoria }}) - 
+                    <span class="{{ t.tipo|lower }}">
+                        R$ {{ "%.2f"|format(t.valor) }}
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>
