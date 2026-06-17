@@ -8,7 +8,8 @@ from datetime import date, datetime
 from functools import wraps
 
 from flask import (
-    Flask, render_template, request, redirect, session, flash, url_for, Response
+    Flask, render_template, request, redirect, session, flash, url_for,
+    Response, abort
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -42,6 +43,35 @@ def get_db():
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+@app.before_request
+def csrf_protect():
+    """Gera um token de sessão e valida em todo POST (proteção CSRF)."""
+    if 'csrf' not in session:
+        session['csrf'] = secrets.token_hex(16)
+    if request.method == 'POST':
+        if request.form.get('csrf', '') != session['csrf']:
+            abort(400)
+
+
+@app.context_processor
+def inject_csrf():
+    """Disponibiliza o token CSRF para os templates."""
+    return {'csrf': session.get('csrf', '')}
+
+
+def parse_valor(texto):
+    """Converte um valor digitado em float, aceitando o formato brasileiro.
+
+    Ex.: '50,00' -> 50.0 | '1.234,56' -> 1234.56 | '1234.56' -> 1234.56
+    Negativos são permitidos (ex.: ajuste/estorno). Lança ValueError se inválido.
+    """
+    s = (texto or '').strip()
+    if ',' in s:
+        # vírgula = decimal; ponto = separador de milhar (padrão BR)
+        s = s.replace('.', '').replace(',', '.')
+    return float(s)
 
 
 def add_months(iso, n):
@@ -451,6 +481,12 @@ def index():
             if t["tipo"] == "DESPESA"
             and (t["forma"] or "DEBITO") == forma_sel
         ]
+    elif forma_sel == 'A_PAGAR':
+        # Só gastos no crédito ainda não pagos.
+        extrato = [
+            t for t in extrato
+            if t["tipo"] == "DESPESA" and t["forma"] == "CREDITO" and not t["pago"]
+        ]
     if q:
         termo = q.lower()
         extrato = [
@@ -460,9 +496,20 @@ def index():
             or termo in (t["detalhes"] or "").lower()
         ]
 
+    # Paginação do extrato (20 por página).
+    POR_PAGINA = 20
+    total_itens = len(extrato)
+    total_paginas = max(1, (total_itens + POR_PAGINA - 1) // POR_PAGINA)
+    pagina = request.args.get('pagina', 1, type=int)
+    pagina = max(1, min(pagina, total_paginas))
+    extrato_pagina = extrato[(pagina - 1) * POR_PAGINA: pagina * POR_PAGINA]
+
     return render_template(
         'index.html',
-        transacoes=extrato,
+        transacoes=extrato_pagina,
+        pagina=pagina,
+        total_paginas=total_paginas,
+        total_itens=total_itens,
         saldo=saldo,
         total_receitas=total_receitas,
         total_despesas=total_despesas,
@@ -484,10 +531,14 @@ def index():
 @app.route('/adicionar', methods=['POST'])
 @login_required
 def adicionar():
-    descricao = request.form['descricao'].strip()
-    valor = float(request.form['valor'])
-    tipo = request.form['tipo']
-    categoria = request.form['categoria'].strip()
+    descricao = request.form.get('descricao', '').strip()
+    try:
+        valor = parse_valor(request.form.get('valor'))
+    except (ValueError, TypeError):
+        flash("Valor inválido. Use números (ex.: 50,00).", "erro")
+        return redirect('/')
+    tipo = request.form.get('tipo', 'DESPESA')
+    categoria = request.form.get('categoria', '').strip()
     data_lanc = request.form.get('data') or date.today().isoformat()
     # Forma de pagamento só faz sentido para gastos; ganhos ficam NULL.
     forma = request.form.get('forma') if tipo == 'DESPESA' else None
@@ -565,17 +616,23 @@ def editar(id):
     uid = session['usuario_id']
 
     if request.method == 'POST':
-        tipo = request.form['tipo']
+        tipo = request.form.get('tipo', 'DESPESA')
         forma = request.form.get('forma') if tipo == 'DESPESA' else None
         detalhes = request.form.get('detalhes', '').strip() or None
+        try:
+            valor = parse_valor(request.form.get('valor'))
+        except (ValueError, TypeError):
+            conn.close()
+            flash("Valor inválido. Use números (ex.: 50,00).", "erro")
+            return redirect(url_for('editar', id=id))
         conn.execute(
             "UPDATE transacoes SET descricao = ?, valor = ?, tipo = ?, "
             "categoria = ?, data = ?, forma = ?, detalhes = ? WHERE id = ? AND usuario_id = ?",
             (
-                request.form['descricao'].strip(),
-                float(request.form['valor']),
+                request.form.get('descricao', '').strip(),
+                valor,
                 tipo,
-                request.form['categoria'].strip(),
+                request.form.get('categoria', '').strip(),
                 request.form.get('data') or date.today().isoformat(),
                 forma,
                 detalhes,
@@ -613,8 +670,8 @@ def orcamentos():
     if request.method == 'POST':
         categoria = request.form.get('categoria', '').strip()
         try:
-            limite = float(request.form.get('limite', '0'))
-        except ValueError:
+            limite = parse_valor(request.form.get('limite', '0'))
+        except (ValueError, TypeError):
             limite = 0
         if categoria and limite > 0:
             # Upsert: um limite por categoria do usuário.
@@ -673,8 +730,8 @@ def recorrentes():
         forma = request.form.get('forma') if tipo == 'DESPESA' else None
         detalhes = request.form.get('detalhes', '').strip() or None
         try:
-            valor = float(request.form.get('valor', '0'))
-        except ValueError:
+            valor = parse_valor(request.form.get('valor', '0'))
+        except (ValueError, TypeError):
             valor = 0
         try:
             dia = max(1, min(31, int(request.form.get('dia', '1'))))

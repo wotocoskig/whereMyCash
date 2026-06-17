@@ -43,6 +43,9 @@
         .busca-linha .btn { width: auto; flex-shrink: 0; }
         .extrato-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
         .extrato-topo h3 { margin: 0; }
+        .paginacao { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+        .paginacao .muted { font-size: 13px; }
+        .btn-acao.desabilitado { opacity: 0.4; cursor: default; }
         .limpar { display: inline-block; margin-top: 6px; font-size: 13px; }
         #campo-parcelas small { display: block; font-size: 12px; margin-top: 2px; }
         @media (max-width: 480px) {
@@ -94,7 +97,7 @@
             </div>
 
             <input type="text" name="descricao" placeholder="Descrição (ex: Mercado)" required>
-            <input type="number" step="0.01" name="valor" placeholder="Valor (ex: 50.00)" required>
+            <input type="text" inputmode="decimal" name="valor" placeholder="Valor (ex: 50,00)" required>
             <input type="text" name="categoria" list="lista-categorias"
                    placeholder="Categoria (digite ou escolha a sua)" required>
             <datalist id="lista-categorias">
@@ -219,6 +222,7 @@
                     <option value="">Crédito e débito</option>
                     <option value="CREDITO" {% if forma_sel == 'CREDITO' %}selected{% endif %}>Só crédito</option>
                     <option value="DEBITO" {% if forma_sel == 'DEBITO' %}selected{% endif %}>Só débito</option>
+                    <option value="A_PAGAR" {% if forma_sel == 'A_PAGAR' %}selected{% endif %}>Só a pagar (crédito)</option>
                 </select>
                 <button type="submit" class="btn">Filtrar</button>
             </div>
@@ -269,5 +273,22 @@
                 {% endif %}
             {% endfor %}
         </ul>
+
+        {% if total_paginas > 1 %}
+            {% set base = '?mes=' ~ mes_sel ~ '&q=' ~ (q|urlencode) ~ '&cat=' ~ (cat_sel|urlencode) ~ '&forma=' ~ forma_sel %}
+            <div class="paginacao">
+                {% if pagina > 1 %}
+                    <a class="btn-acao" href="{{ base }}&pagina={{ pagina - 1 }}">← Anterior</a>
+                {% else %}
+                    <span class="btn-acao desabilitado">← Anterior</span>
+                {% endif %}
+                <span class="muted">Página {{ pagina }} de {{ total_paginas }} ({{ total_itens }} lançamentos)</span>
+                {% if pagina < total_paginas %}
+                    <a class="btn-acao" href="{{ base }}&pagina={{ pagina + 1 }}">Próxima →</a>
+                {% else %}
+                    <span class="btn-acao desabilitado">Próxima →</span>
+                {% endif %}
+            </div>
+        {% endif %}
     </div>
 {% endblock %}

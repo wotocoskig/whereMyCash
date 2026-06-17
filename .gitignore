@@ -4,6 +4,10 @@ database.db
 # Chave secreta das sessões (gerada localmente — nunca versionar)
 secret_key.txt
 
+# Arquivos .txt soltos (ex.: cookies de teste) — exceto o requirements
+*.txt
+!requirements.txt
+
 # Cache do Python
 __pycache__/
 *.pyc

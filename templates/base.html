@@ -168,6 +168,21 @@
             navigator.serviceWorker.register('/sw.js').catch(function () {});
         }
 
+        // CSRF: injeta o token em todo formulário POST automaticamente.
+        (function () {
+            var token = '{{ csrf }}';
+            document.querySelectorAll('form').forEach(function (f) {
+                if (f.method && f.method.toLowerCase() === 'post'
+                        && !f.querySelector('input[name="csrf"]')) {
+                    var i = document.createElement('input');
+                    i.type = 'hidden';
+                    i.name = 'csrf';
+                    i.value = token;
+                    f.appendChild(i);
+                }
+            });
+        })();
+
         // Mostra/esconde o campo de senha (botão do olhinho).
         function verSenha(btn) {
             var inp = btn.parentElement.querySelector('input');
