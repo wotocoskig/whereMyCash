@@ -96,6 +96,33 @@
             background-repeat: no-repeat; background-position: right 14px center; background-size: 14px;
         }
         select option { background: var(--card-bg); color: var(--text); }
+        /* Dropdown customizado (substitui o <select> visualmente; o select real
+           fica escondido mas continua enviando o valor no formulário). */
+        .dd { position: relative; margin: 6px 0; }
+        .dd-btn {
+            width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px;
+            background: var(--card-bg); color: var(--text); cursor: pointer; font: inherit; text-align: left;
+            margin: 0;
+        }
+        .dd-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
+        .dd-arrow { flex-shrink: 0; color: var(--muted); transition: transform 0.18s ease; font-size: 12px; }
+        .dd.aberto .dd-arrow { transform: rotate(180deg); }
+        .dd-list {
+            list-style: none; margin: 6px 0 0; padding: 6px; position: absolute; left: 0; right: 0; z-index: 30;
+            background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+            max-height: 260px; overflow-y: auto;
+            opacity: 0; transform: translateY(-6px); pointer-events: none;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+        .dd.aberto .dd-list { opacity: 1; transform: translateY(0); pointer-events: auto; }
+        .dd-opt {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            padding: 10px 12px; border-radius: 9px; cursor: pointer; font-size: 15px;
+        }
+        .dd-opt:hover, .dd-opt.foco { background: var(--track); }
+        .dd-opt[aria-selected="true"] { color: var(--accent); font-weight: 700; }
+        .dd-check { color: var(--accent); }
         input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
         .btn { background: var(--accent); color: #fff; border: none; font-weight: 700; cursor: pointer; transition: background 0.15s ease; }
         .btn:hover { background: var(--accent-hover); }
@@ -178,6 +205,66 @@
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').catch(function () {});
         }
+
+        // Dropdown customizado: substitui cada <select> por uma UI no tema do app,
+        // mantendo o <select> real escondido (continua enviando o valor no form e
+        // disparando 'change', então auto-submit/toggles seguem funcionando).
+        function enhanceSelect(sel) {
+            if (sel.dataset.enhanced) return;
+            sel.dataset.enhanced = '1';
+            sel.style.display = 'none';
+
+            var dd = document.createElement('div'); dd.className = 'dd';
+            var btn = document.createElement('button');
+            btn.type = 'button'; btn.className = 'dd-btn';
+            btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-expanded', 'false');
+            var lab = document.createElement('span');
+            var arr = document.createElement('span'); arr.className = 'dd-arrow'; arr.textContent = '▾'; arr.setAttribute('aria-hidden', 'true');
+            btn.appendChild(lab); btn.appendChild(arr);
+            var list = document.createElement('ul'); list.className = 'dd-list'; list.setAttribute('role', 'listbox');
+
+            function syncLabel() {
+                var o = sel.options[sel.selectedIndex];
+                lab.textContent = o ? o.text : '';
+            }
+            function build() {
+                list.innerHTML = '';
+                Array.prototype.forEach.call(sel.options, function (o, i) {
+                    var li = document.createElement('li');
+                    li.className = 'dd-opt'; li.setAttribute('role', 'option');
+                    li.setAttribute('aria-selected', o.selected ? 'true' : 'false');
+                    var t = document.createElement('span'); t.textContent = o.text; li.appendChild(t);
+                    if (o.selected) { var c = document.createElement('span'); c.className = 'dd-check'; c.textContent = '✓'; li.appendChild(c); }
+                    li.addEventListener('click', function (e) { e.stopPropagation(); escolher(i); });
+                    list.appendChild(li);
+                });
+            }
+            function abrir() {
+                document.querySelectorAll('.dd.aberto').forEach(function (x) { if (x !== dd) x.classList.remove('aberto'); });
+                dd.classList.add('aberto'); btn.setAttribute('aria-expanded', 'true');
+            }
+            function fechar() { dd.classList.remove('aberto'); btn.setAttribute('aria-expanded', 'false'); }
+            function escolher(i) {
+                sel.selectedIndex = i;
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+                syncLabel(); build(); fechar();
+            }
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                dd.classList.contains('aberto') ? fechar() : abrir();
+            });
+            btn.addEventListener('keydown', function (e) { if (e.key === 'Escape') fechar(); });
+            // Se algo mudar o select por código, mantém o rótulo em dia.
+            sel.addEventListener('change', function () { syncLabel(); build(); });
+
+            dd.appendChild(btn); dd.appendChild(list);
+            sel.parentNode.insertBefore(dd, sel.nextSibling);
+            syncLabel(); build();
+        }
+        document.querySelectorAll('select').forEach(enhanceSelect);
+        document.addEventListener('click', function () {
+            document.querySelectorAll('.dd.aberto').forEach(function (x) { x.classList.remove('aberto'); });
+        });
 
         // CSRF: injeta o token em todo formulário POST automaticamente.
         (function () {

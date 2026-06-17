@@ -9,6 +9,8 @@
         .filtro { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
         .filtro label { margin: 0; white-space: nowrap; }
         .filtro select { margin: 0; max-width: 220px; }
+        .filtro .dd { margin: 0; flex: 1; max-width: 220px; }
+        .busca-linha .dd { margin: 0; flex: 1; }
         .grafico { list-style: none; padding: 0; margin: 0; }
         .grafico li { margin-bottom: 12px; }
         .barra-topo { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
@@ -107,10 +109,12 @@
             </datalist>
             <textarea name="detalhes" rows="2" placeholder="Detalhes (opcional) — o que você comprou?"></textarea>
             <input type="date" name="data" value="{{ hoje }}" required>
-            <select name="forma" id="forma" onchange="atualizarCampos()">
-                <option value="DEBITO">Débito (já pago)</option>
-                <option value="CREDITO">Crédito (a pagar)</option>
-            </select>
+            <div id="campo-forma">
+                <select name="forma" id="forma" onchange="atualizarCampos()">
+                    <option value="DEBITO">Débito (já pago)</option>
+                    <option value="CREDITO">Crédito (a pagar)</option>
+                </select>
+            </div>
             <div id="campo-parcelas">
                 <label for="parcelas">Parcelas</label>
                 <input type="number" id="parcelas" name="parcelas" min="1" max="60" value="1">
@@ -143,7 +147,8 @@
         function atualizarCampos() {
             var ehGasto = document.getElementById('tipo-gasto').checked;
             var forma = document.getElementById('forma');
-            forma.style.display = ehGasto ? 'block' : 'none';
+            // Mostra/esconde o WRAPPER (inclui o dropdown customizado).
+            document.getElementById('campo-forma').style.display = ehGasto ? 'block' : 'none';
             var ehCredito = forma.value === 'CREDITO';
             document.getElementById('campo-parcelas').style.display = (ehGasto && ehCredito) ? 'block' : 'none';
         }
