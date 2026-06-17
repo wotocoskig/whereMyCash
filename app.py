@@ -98,6 +98,17 @@ def init_db():
         # Anotação opcional do usuário sobre a compra (o que foi comprado etc.).
         conn.execute("ALTER TABLE transacoes ADD COLUMN detalhes TEXT")
 
+    # Admin: marca o usuário com privilégio de administração.
+    ucols = [c["name"] for c in conn.execute("PRAGMA table_info(users)")]
+    if "is_admin" not in ucols:
+        conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+    # Garante ao menos um admin: promove o usuário mais antigo se não houver nenhum.
+    tem_admin = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
+    total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if tem_admin == 0 and total_users > 0:
+        primeiro = conn.execute("SELECT id FROM users ORDER BY id LIMIT 1").fetchone()[0]
+        conn.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (primeiro,))
+
     # Orçamentos: limite de gasto por categoria, por usuário (um por categoria).
     conn.execute("""
         CREATE TABLE IF NOT EXISTS orcamentos (
@@ -181,6 +192,26 @@ def login_required(f):
     return wrapper
 
 
+def is_admin(uid):
+    """Consulta no banco se o usuário é admin (fonte da verdade, não a sessão)."""
+    conn = get_db()
+    u = conn.execute("SELECT is_admin FROM users WHERE id = ?", (uid,)).fetchone()
+    conn.close()
+    return bool(u and u["is_admin"])
+
+
+def admin_required(f):
+    """Protege rotas de administração: exige sessão E privilégio de admin."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if "usuario_id" not in session:
+            return redirect(url_for("login"))
+        if not is_admin(session["usuario_id"]):
+            return redirect('/')
+        return f(*args, **kwargs)
+    return wrapper
+
+
 @app.route('/registrar', methods=['GET', 'POST'])
 def registrar():
     if "usuario_id" in session:
@@ -216,19 +247,22 @@ def registrar():
         )
         novo_id = cur.lastrowid
 
-        # Se for o primeiro usuário, adota transações antigas que não tinham dono.
+        # Se for o primeiro usuário: adota transações sem dono e vira admin.
         total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-        if total_users == 1:
+        eh_primeiro = total_users == 1
+        if eh_primeiro:
             conn.execute(
                 "UPDATE transacoes SET usuario_id = ? WHERE usuario_id IS NULL",
                 (novo_id,),
             )
+            conn.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (novo_id,))
 
         conn.commit()
         conn.close()
 
         session['usuario_id'] = novo_id
         session['usuario_nome'] = username
+        session['is_admin'] = 1 if eh_primeiro else 0
         flash("Conta criada com sucesso! Bem-vindo(a). 🎉", "ok")
         return redirect('/')
 
@@ -256,6 +290,7 @@ def login():
 
         session['usuario_id'] = user["id"]
         session['usuario_nome'] = user["username"]
+        session['is_admin'] = user["is_admin"]
         return redirect('/')
 
     return render_template('login.html')
@@ -668,6 +703,122 @@ def excluir_recorrente(id):
     conn.commit()
     conn.close()
     return redirect(url_for('recorrentes'))
+
+
+# ---- Trocar a própria senha (qualquer usuário logado) ----
+
+@app.route('/trocar-senha', methods=['GET', 'POST'])
+@login_required
+def trocar_senha():
+    if request.method == 'POST':
+        atual = request.form.get('atual', '')
+        nova = request.form.get('nova', '')
+        nova2 = request.form.get('nova2', '')
+
+        conn = get_db()
+        u = conn.execute(
+            "SELECT senha_hash FROM users WHERE id = ?", (session['usuario_id'],)
+        ).fetchone()
+
+        if not u or not check_password_hash(u["senha_hash"], atual):
+            flash("Senha atual incorreta.", "erro")
+        elif len(nova) < 4:
+            flash("A nova senha precisa ter pelo menos 4 caracteres.", "erro")
+        elif nova != nova2:
+            flash("A confirmação da nova senha não confere.", "erro")
+        else:
+            conn.execute(
+                "UPDATE users SET senha_hash = ? WHERE id = ?",
+                (generate_password_hash(nova), session['usuario_id']),
+            )
+            conn.commit()
+            conn.close()
+            flash("Senha alterada com sucesso! 🔑", "ok")
+            return redirect('/')
+        conn.close()
+
+    return render_template('trocar_senha.html')
+
+
+# ---- Painel de administração (somente admin) ----
+
+@app.route('/admin')
+@admin_required
+def admin():
+    conn = get_db()
+    usuarios = conn.execute("""
+        SELECT u.id, u.username, u.criado_em, u.is_admin,
+               (SELECT COUNT(*) FROM transacoes t WHERE t.usuario_id = u.id) AS qtd
+        FROM users u
+        ORDER BY u.username COLLATE NOCASE
+    """).fetchall()
+    conn.close()
+    return render_template('admin.html', usuarios=usuarios, eu=session['usuario_id'])
+
+
+@app.route('/admin/reset-senha/<int:id>', methods=['POST'])
+@admin_required
+def admin_reset_senha(id):
+    nova = request.form.get('senha', '')
+    if len(nova) < 4:
+        flash("A nova senha precisa ter pelo menos 4 caracteres.", "erro")
+    else:
+        conn = get_db()
+        conn.execute(
+            "UPDATE users SET senha_hash = ? WHERE id = ?",
+            (generate_password_hash(nova), id),
+        )
+        conn.commit()
+        conn.close()
+        flash("Senha redefinida.", "ok")
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/excluir/<int:id>', methods=['POST'])
+@admin_required
+def admin_excluir(id):
+    if id == session['usuario_id']:
+        flash("Você não pode excluir a própria conta pelo painel.", "erro")
+        return redirect(url_for('admin'))
+
+    conn = get_db()
+    alvo = conn.execute("SELECT is_admin FROM users WHERE id = ?", (id,)).fetchone()
+    admins = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
+    if alvo and alvo["is_admin"] and admins <= 1:
+        conn.close()
+        flash("Não dá pra excluir o último admin.", "erro")
+        return redirect(url_for('admin'))
+
+    # Remove o usuário e tudo que pertence a ele.
+    conn.execute("DELETE FROM transacoes WHERE usuario_id = ?", (id,))
+    conn.execute("DELETE FROM orcamentos WHERE usuario_id = ?", (id,))
+    conn.execute("DELETE FROM recorrentes WHERE usuario_id = ?", (id,))
+    conn.execute("DELETE FROM users WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    flash("Usuário excluído.", "ok")
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/promover/<int:id>', methods=['POST'])
+@admin_required
+def admin_promover(id):
+    conn = get_db()
+    alvo = conn.execute("SELECT is_admin FROM users WHERE id = ?", (id,)).fetchone()
+    if alvo:
+        novo = 0 if alvo["is_admin"] else 1
+        if novo == 0:
+            admins = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
+            if admins <= 1:
+                conn.close()
+                flash("Não dá pra remover o último admin.", "erro")
+                return redirect(url_for('admin'))
+        conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (novo, id))
+        conn.commit()
+        if id == session['usuario_id']:
+            session['is_admin'] = novo
+    conn.close()
+    return redirect(url_for('admin'))
 
 
 # Garante que as tabelas existam assim que o módulo é importado (produção/WSGI).

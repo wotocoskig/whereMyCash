@@ -54,8 +54,8 @@
         .brand .cash { color: var(--accent); }
         .topbar-actions { display: flex; align-items: center; gap: 8px; }
         .user-chip { color: var(--muted); font-size: 14px; white-space: nowrap; }
-        .nav { display: flex; gap: 8px; margin-bottom: 18px; }
-        .nav a { flex: 1; text-align: center; padding: 10px; border-radius: 12px; text-decoration: none;
+        .nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+        .nav a { flex: 1 1 auto; min-width: 90px; text-align: center; padding: 10px; border-radius: 12px; text-decoration: none;
                  background: var(--card-bg); border: 1px solid var(--border); color: var(--text); font-weight: 600; font-size: 14px; }
         .nav a:hover { border-color: var(--accent); color: var(--accent); }
         .icon-btn {
@@ -120,6 +120,10 @@
                 <a href="{{ url_for('index') }}">🏠 Início</a>
                 <a href="{{ url_for('orcamentos') }}">🎯 Orçamentos</a>
                 <a href="{{ url_for('recorrentes') }}">🔁 Recorrentes</a>
+                <a href="{{ url_for('trocar_senha') }}">🔑 Senha</a>
+                {% if session.get('is_admin') %}
+                    <a href="{{ url_for('admin') }}">👑 Admin</a>
+                {% endif %}
             </nav>
         {% endif %}
 

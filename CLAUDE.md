@@ -20,7 +20,15 @@ python app.py
 Servidor de desenvolvimento em http://127.0.0.1:5000 (debug ligado).
 
 ## Modelo de dados
-Tabela `users`: `id`, `username` (único), `senha_hash`, `criado_em`.
+Tabela `users`: `id`, `username` (único), `senha_hash`, `criado_em`, `is_admin`
+(0/1). O **primeiro** usuário cadastrado vira admin; `init_db()` também promove o
+usuário mais antigo se nenhum admin existir (cobre o deploy de bancos antigos).
+
+**Admin:** decorator `admin_required` (consulta `is_admin` no banco, não na sessão).
+Painel `/admin`: resetar senha, excluir usuário (cascata em transacoes/orcamentos/
+recorrentes), promover/rebaixar admin. Proteções: não excluir a si mesmo, não remover
+o último admin. Qualquer usuário troca a própria senha em `/trocar-senha`.
+Recuperação por e-mail foi descartada (PythonAnywhere free bloqueia envio).
 
 Tabela `orcamentos`: `id`, `usuario_id`, `categoria`, `limite` — UNIQUE(usuario_id,
 categoria). Limite de gasto mensal por categoria (upsert via ON CONFLICT). A home

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+
+{% block extra_css %}
+        .user-item { padding: 14px 0; border-bottom: 1px solid var(--border); }
+        .user-item:last-child { border-bottom: none; }
+        .user-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        .user-nome { font-weight: 700; }
+        .badge-admin { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+                       background: rgba(37, 99, 235, 0.15); color: var(--accent); }
+        .user-meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+        .user-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .user-acoes form { width: auto; margin: 0; display: flex; gap: 6px; }
+        .user-acoes input[type=password] { width: 150px; margin: 0; padding: 8px 10px; }
+        .mini { width: auto; margin: 0; padding: 8px 12px; font-size: 13px; border-radius: 9px; cursor: pointer;
+                border: 1px solid var(--border); background: var(--card-bg); color: var(--text); }
+        .mini:hover { border-color: var(--accent); }
+        .mini.perigo:hover { border-color: var(--despesa); color: var(--despesa); }
+{% endblock %}
+
+{% block conteudo %}
+<div class="card">
+    <h3>👑 Administração de usuários</h3>
+    <p class="muted" style="margin-top: -6px;">Resete senhas, promova admins ou remova contas.</p>
+
+    {% for u in usuarios %}
+    <div class="user-item">
+        <div class="user-top">
+            <div>
+                <span class="user-nome">{{ u.username }}</span>
+                {% if u.is_admin %}<span class="badge-admin">admin</span>{% endif %}
+                {% if u.id == eu %}<span class="muted">(você)</span>{% endif %}
+                <div class="user-meta">Desde {{ u.criado_em|data_br }} • {{ u.qtd }} lançamento(s)</div>
+            </div>
+        </div>
+        <div class="user-acoes">
+            <!-- Resetar senha -->
+            <form action="{{ url_for('admin_reset_senha', id=u.id) }}" method="POST">
+                <input type="password" name="senha" placeholder="Nova senha" minlength="4" required>
+                <button type="submit" class="mini">Resetar senha</button>
+            </form>
+            <!-- Promover / remover admin -->
+            <form action="{{ url_for('admin_promover', id=u.id) }}" method="POST"
+                  onsubmit="return confirm('{{ 'Remover admin de' if u.is_admin else 'Tornar admin' }} {{ u.username }}?');">
+                <button type="submit" class="mini">{{ 'Remover admin' if u.is_admin else 'Tornar admin' }}</button>
+            </form>
+            <!-- Excluir usuário -->
+            {% if u.id != eu %}
+            <form action="{{ url_for('admin_excluir', id=u.id) }}" method="POST"
+                  onsubmit="return confirm('Excluir {{ u.username }} e TODOS os lançamentos dele? Isso não tem volta.');">
+                <button type="submit" class="mini perigo">Excluir</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
