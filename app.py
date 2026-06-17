@@ -759,6 +759,18 @@ def exportar():
     )
 
 
+# ---- PWA: service worker (servido na raiz para ter escopo '/') ----
+
+@app.route('/sw.js')
+def service_worker():
+    js = (
+        "self.addEventListener('install', e => self.skipWaiting());\n"
+        "self.addEventListener('activate', e => self.clients.claim());\n"
+        "self.addEventListener('fetch', e => {});\n"
+    )
+    return Response(js, mimetype='application/javascript')
+
+
 # ---- Evolução: comparativo mês a mês ----
 
 @app.route('/evolucao')

@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}wheresMyCash{% endblock %}</title>
+    <!-- PWA: instalável no celular -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="wheresMyCash">
     <script>
         // Aplica o tema salvo ANTES de renderizar (evita "piscada" de cor)
         (function () {
@@ -156,6 +162,11 @@
             setIconeTema();
         }
         setIconeTema();
+
+        // PWA: registra o service worker (permite instalar na tela inicial).
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(function () {});
+        }
 
         // Mostra/esconde o campo de senha (botão do olhinho).
         function verSenha(btn) {
