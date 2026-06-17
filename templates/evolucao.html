@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Evolução{% endblock %}
+
+{% block extra_css %}
+        .mes-bloco { padding: 14px 0; border-bottom: 1px solid var(--border); }
+        .mes-bloco:last-child { border-bottom: none; }
+        .mes-topo { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+        .mes-topo strong { font-size: 16px; }
+        .linha { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .linha .rot { width: 58px; font-size: 13px; color: var(--muted); }
+        .linha .trilho { flex: 1; background: var(--track); border-radius: 6px; height: 16px; overflow: hidden; }
+        .linha .val { width: 110px; text-align: right; font-size: 13px; }
+        .b-ganho { background: var(--receita); height: 100%; border-radius: 6px; }
+        .b-gasto { background: var(--despesa); height: 100%; border-radius: 6px; }
+{% endblock %}
+
+{% block conteudo %}
+<div class="card">
+    <h3>📈 Evolução mês a mês</h3>
+    <p class="muted" style="margin-top: -6px;">Ganhos, gastos e saldo dos últimos meses.</p>
+
+    {% for d in dados %}
+        <div class="mes-bloco">
+            <div class="mes-topo">
+                <strong>{{ d.mes|mes_br }}</strong>
+                <span class="{{ 'receita' if d.saldo >= 0 else 'despesa' }}">
+                    saldo R$ {{ d.saldo|moeda }}
+                </span>
+            </div>
+            <div class="linha">
+                <span class="rot">Ganhos</span>
+                <div class="trilho"><div class="b-ganho" style="width: {{ d.pg }}%;"></div></div>
+                <span class="val receita">R$ {{ d.ganhos|moeda }}</span>
+            </div>
+            <div class="linha">
+                <span class="rot">Gastos</span>
+                <div class="trilho"><div class="b-gasto" style="width: {{ d.pd }}%;"></div></div>
+                <span class="val despesa">R$ {{ d.gastos|moeda }}</span>
+            </div>
+        </div>
+    {% else %}
+        <p class="muted" style="font-style: italic;">Ainda não há lançamentos para comparar.</p>
+    {% endfor %}
+</div>
+{% endblock %}

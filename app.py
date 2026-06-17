@@ -759,6 +759,47 @@ def exportar():
     )
 
 
+# ---- Evolução: comparativo mês a mês ----
+
+@app.route('/evolucao')
+@login_required
+def evolucao():
+    uid = session['usuario_id']
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT data, tipo, valor FROM transacoes WHERE usuario_id = ?", (uid,)
+    ).fetchall()
+    conn.close()
+
+    # Agrega ganhos e gastos por mês (AAAA-MM).
+    por_mes = {}
+    for r in rows:
+        if not r["data"]:
+            continue
+        m = r["data"][:7]
+        d = por_mes.setdefault(m, {"ganhos": 0.0, "gastos": 0.0})
+        if r["tipo"] == "RECEITA":
+            d["ganhos"] += r["valor"]
+        else:
+            d["gastos"] += r["valor"]
+
+    # Ordem cronológica, no máximo os 12 meses mais recentes.
+    ordenados = sorted(por_mes.items())[-12:]
+    maior = max((max(d["ganhos"], d["gastos"]) for _, d in ordenados), default=0)
+    dados = [
+        {
+            "mes": m,
+            "ganhos": d["ganhos"],
+            "gastos": d["gastos"],
+            "saldo": d["ganhos"] - d["gastos"],
+            "pg": (d["ganhos"] / maior * 100) if maior else 0,
+            "pd": (d["gastos"] / maior * 100) if maior else 0,
+        }
+        for m, d in ordenados
+    ]
+    return render_template('evolucao.html', dados=dados)
+
+
 # ---- Trocar a própria senha (qualquer usuário logado) ----
 
 @app.route('/trocar-senha', methods=['GET', 'POST'])
