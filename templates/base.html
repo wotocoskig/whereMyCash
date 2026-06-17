@@ -153,6 +153,9 @@
         .modal-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex;
                     align-items: center; justify-content: center; z-index: 1000; padding: 20px;
                     opacity: 0; transition: opacity 0.18s ease; }
+        /* hidden precisa vencer o display:flex acima, senão o overlay invisível
+           cobre a tela e bloqueia todos os cliques */
+        .modal-bg[hidden] { display: none; }
         .modal-bg.aberto { opacity: 1; }
         .modal-box { background: var(--card-bg); color: var(--text); border-radius: 16px;
                      box-shadow: var(--shadow); padding: 24px; max-width: 360px; width: 100%;
