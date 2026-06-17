@@ -233,8 +233,9 @@ def registrar():
             return render_template('registrar.html', username=username)
 
         conn = get_db()
+        # COLLATE NOCASE: 'Gustavo' e 'gustavo' são o mesmo usuário (evita duplicar).
         existe = conn.execute(
-            "SELECT 1 FROM users WHERE username = ?", (username,)
+            "SELECT 1 FROM users WHERE username = ? COLLATE NOCASE", (username,)
         ).fetchone()
         if existe:
             conn.close()
@@ -279,8 +280,9 @@ def login():
         senha = request.form.get('senha', '')
 
         conn = get_db()
+        # COLLATE NOCASE: aceita o nome em qualquer caixa (não tranca o usuário fora).
         user = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
+            "SELECT * FROM users WHERE username = ? COLLATE NOCASE", (username,)
         ).fetchone()
         conn.close()
 
