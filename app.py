@@ -1,4 +1,6 @@
 import calendar
+import csv
+import io
 import os
 import secrets
 import sqlite3
@@ -6,7 +8,7 @@ from datetime import date, datetime
 from functools import wraps
 
 from flask import (
-    Flask, render_template, request, redirect, session, flash, url_for
+    Flask, render_template, request, redirect, session, flash, url_for, Response
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -705,6 +707,38 @@ def excluir_recorrente(id):
     conn.commit()
     conn.close()
     return redirect(url_for('recorrentes'))
+
+
+# ---- Exportar transações em CSV (backup / análise no Excel) ----
+
+@app.route('/exportar')
+@login_required
+def exportar():
+    uid = session['usuario_id']
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT data, descricao, categoria, tipo, forma, valor, detalhes "
+        "FROM transacoes WHERE usuario_id = ? ORDER BY data, id",
+        (uid,),
+    ).fetchall()
+    conn.close()
+
+    buf = io.StringIO()
+    buf.write('﻿')  # BOM: garante acentos corretos no Excel
+    w = csv.writer(buf, delimiter=';')   # ';' = padrão pt-BR do Excel
+    w.writerow(['Data', 'Descrição', 'Categoria', 'Tipo', 'Forma', 'Valor', 'Detalhes'])
+    for r in rows:
+        tipo = 'Ganho' if r["tipo"] == 'RECEITA' else 'Gasto'
+        forma = '' if not r["forma"] else ('Crédito' if r["forma"] == 'CREDITO' else 'Débito')
+        valor = f"{r['valor']:.2f}".replace('.', ',')   # decimal com vírgula
+        w.writerow([data_br(r["data"]), r["descricao"], r["categoria"],
+                    tipo, forma, valor, r["detalhes"] or ''])
+
+    return Response(
+        buf.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=wheresmycash.csv'},
+    )
 
 
 # ---- Trocar a própria senha (qualquer usuário logado) ----

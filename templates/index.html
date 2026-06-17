@@ -41,6 +41,8 @@
         .busca-linha { display: flex; gap: 8px; }
         .busca-linha select { flex: 1; }
         .busca-linha .btn { width: auto; flex-shrink: 0; }
+        .extrato-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+        .extrato-topo h3 { margin: 0; }
         .limpar { display: inline-block; margin-top: 6px; font-size: 13px; }
         #campo-parcelas small { display: block; font-size: 12px; margin-top: 2px; }
         @media (max-width: 480px) {
@@ -197,7 +199,10 @@
 
     <!-- Extrato -->
     <div class="card">
-        <h3>🧾 Extrato {% if mes_sel != 'todos' %}— {{ mes_sel|mes_br }}{% endif %}</h3>
+        <div class="extrato-topo">
+            <h3>🧾 Extrato {% if mes_sel != 'todos' %}— {{ mes_sel|mes_br }}{% endif %}</h3>
+            <a class="link" href="{{ url_for('exportar') }}">⬇️ Exportar CSV</a>
+        </div>
 
         <!-- Busca e filtros do extrato -->
         <form class="busca" method="GET" action="/">
