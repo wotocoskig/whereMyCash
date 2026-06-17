@@ -99,6 +99,9 @@ def init_db():
     if "detalhes" not in colunas:
         # Anotação opcional do usuário sobre a compra (o que foi comprado etc.).
         conn.execute("ALTER TABLE transacoes ADD COLUMN detalhes TEXT")
+    if "pago" not in colunas:
+        # Para gastos no CRÉDITO: 1 = fatura já paga; 0 = ainda a pagar.
+        conn.execute("ALTER TABLE transacoes ADD COLUMN pago INTEGER NOT NULL DEFAULT 0")
 
     # Admin: marca o usuário com privilégio de administração.
     ucols = [c["name"] for c in conn.execute("PRAGMA table_info(users)")]
@@ -395,7 +398,7 @@ def index():
     # (débito ou lançamentos antigos sem forma definida).
     total_a_pagar = sum(
         t["valor"] for t in tx_mes
-        if t["tipo"] == "DESPESA" and t["forma"] == "CREDITO"
+        if t["tipo"] == "DESPESA" and t["forma"] == "CREDITO" and not t["pago"]
     )
     total_pago = total_despesas - total_a_pagar
     pct_pago = (total_pago / total_despesas * 100) if total_despesas else 0
@@ -524,6 +527,21 @@ def adicionar():
     conn.close()
 
     return redirect('/')
+
+
+@app.route('/pagar/<int:id>', methods=['POST'])
+@login_required
+def pagar(id):
+    # Alterna o status de pago de um gasto no crédito (só do próprio usuário).
+    conn = get_db()
+    conn.execute(
+        "UPDATE transacoes SET pago = CASE WHEN pago = 1 THEN 0 ELSE 1 END "
+        "WHERE id = ? AND usuario_id = ? AND forma = 'CREDITO'",
+        (id, session['usuario_id']),
+    )
+    conn.commit()
+    conn.close()
+    return redirect(request.referrer or '/')
 
 
 @app.route('/excluir/<int:id>', methods=['POST'])

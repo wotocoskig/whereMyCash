@@ -234,7 +234,11 @@
                         <span class="desc">{{ t.descricao }}</span>
                         <span class="{{ t.tipo|lower }}">R$ {{ t.valor|moeda }}</span>
                         {% if t.tipo == 'DESPESA' and t.forma == 'CREDITO' %}
-                            <span class="tag tag-credito">crédito</span>
+                            {% if t.pago %}
+                                <span class="tag tag-debito">crédito ✓ pago</span>
+                            {% else %}
+                                <span class="tag tag-credito">crédito · a pagar</span>
+                            {% endif %}
                         {% elif t.tipo == 'DESPESA' %}
                             <span class="tag tag-debito">débito</span>
                         {% endif %}
@@ -244,6 +248,12 @@
                         {% endif %}
                     </span>
                     <span class="acoes">
+                        {% if t.tipo == 'DESPESA' and t.forma == 'CREDITO' %}
+                            <form action="/pagar/{{ t.id }}" method="POST">
+                                <button type="submit" class="btn-acao"
+                                        title="{{ 'Marcar como a pagar' if t.pago else 'Marcar fatura como paga' }}">{{ '↩️' if t.pago else '✅' }}</button>
+                            </form>
+                        {% endif %}
                         <a class="btn-acao" href="/editar/{{ t.id }}">✏️</a>
                         <form action="/excluir/{{ t.id }}" method="POST"
                               onsubmit="return confirm('Excluir este lançamento?');">
