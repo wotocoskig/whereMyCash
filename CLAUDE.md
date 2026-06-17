@@ -53,6 +53,17 @@ Tabela `transacoes`:
   (já pago). Ganhos e dados antigos ficam NULL = tratados como "já pago".
 - `detalhes` TEXT → anotação opcional do usuário (o que foi comprado). Vazio vira
   NULL. Aparece no extrato só quando preenchido.
+- `pago` INTEGER (0/1) → só p/ gasto no CRÉDITO: 1 = fatura paga. "Falta pagar" =
+  crédito não pago; rota `/pagar/<id>` alterna. Botão e tag no extrato.
+
+**Outras telas/rotas:** `/exportar` (CSV pt-BR com `;` e BOM, p/ Excel/backup);
+`/evolucao` (comparativo mês a mês, ganhos/gastos/saldo dos últimos 12 meses).
+**PWA:** `static/manifest.json` + `/sw.js` (escopo raiz) + meta tags no `base.html`
+→ instalável no celular (precisa HTTPS, ok na produção). Ícones em `static/`.
+Pillow foi usado só p/ gerar os ícones — NÃO é dependência de runtime.
+
+**Login:** username comparado com `COLLATE NOCASE` (case-insensitive) no login e na
+checagem de duplicado. Campos de senha têm botão mostrar/esconder (`verSenha`).
 
 **UI:** "Ganho"/"Gasto" são só rótulos de tela; no banco continuam `RECEITA`/`DESPESA`.
 A home mostra "Já pago" (débito + NULL) vs "Falta pagar" (crédito) do período, pra
