@@ -82,10 +82,15 @@ A home mostra "Já pago" (débito + NULL) vs "Falta pagar" (crédito) do períod
 fechar o mês. O campo de forma só aparece quando o tipo é Gasto. O seletor de tipo
 são dois botões (radio estilizado), CSS em `base.html`.
 
-**Categoria:** campo de texto livre com `<datalist>` das categorias que o próprio
-usuário já usou (lista personalizada auto-construída) — passado como `categorias`
-pelas rotas `/`, `/editar`, `/orcamentos` e `/recorrentes`. Descrição = livre (item);
-detalhes = nota opcional.
+**Categoria:** campo de texto livre com `<datalist>`. Sugestões = `categorias_do_usuario()`
+= categorias **gerenciadas** (tabela `categorias`, página `/categorias`) + as já usadas
+em lançamentos, sem repetir por caixa. Agrupamento e match de orçamento são
+**case-insensitive** (lower + strip) — "Mercado"/"mercado"/"Mercado " contam como uma só.
+Tabela `categorias`: `id`, `usuario_id`, `nome` (COLLATE NOCASE, UNIQUE por usuário).
+Excluir uma categoria gerenciada não afeta os lançamentos. Descrição = livre; detalhes = nota.
+
+**Menu:** Início, Orçamentos, Recorrentes, Evolução, Categorias (+ Admin se admin).
+Trocar senha é o ícone 🔑 na barra do topo (ao lado de sair).
 
 **Extrato:** tem busca (`q` em descrição/categoria/detalhes) + filtros por categoria
 (`cat`) e forma (`forma`). Os filtros afetam só a lista; cards/gráfico seguem o mês.

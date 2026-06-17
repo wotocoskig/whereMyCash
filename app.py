@@ -101,13 +101,20 @@ def add_months(iso, n):
 
 
 def categorias_do_usuario(conn, uid):
-    """Lista (ordenada, sem repetir) as categorias que o usuário já usou."""
-    rows = conn.execute(
-        "SELECT DISTINCT categoria FROM transacoes "
-        "WHERE usuario_id = ? AND categoria <> '' ORDER BY categoria COLLATE NOCASE",
+    """Lista de categorias para sugestão: as gerenciadas + as já usadas em
+    lançamentos, sem repetir (ignora maiúsc/minúsc) e em ordem alfabética."""
+    nomes = {}  # chave lower -> nome de exibição
+    for r in conn.execute(
+        "SELECT nome FROM categorias WHERE usuario_id = ? ORDER BY nome COLLATE NOCASE",
         (uid,),
-    ).fetchall()
-    return [r["categoria"] for r in rows]
+    ):
+        nomes.setdefault(r["nome"].strip().lower(), r["nome"].strip())
+    for r in conn.execute(
+        "SELECT DISTINCT categoria FROM transacoes WHERE usuario_id = ? AND categoria <> ''",
+        (uid,),
+    ):
+        nomes.setdefault(r["categoria"].strip().lower(), r["categoria"].strip())
+    return sorted(nomes.values(), key=str.lower)
 
 
 def eh_ultimo_admin(conn, uid):
@@ -177,6 +184,17 @@ def init_db():
     if tem_admin == 0 and total_users > 0:
         primeiro = conn.execute("SELECT id FROM users ORDER BY id LIMIT 1").fetchone()[0]
         conn.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (primeiro,))
+
+    # Categorias gerenciadas pelo usuário. COLLATE NOCASE no nome faz o UNIQUE
+    # tratar "Mercado" e "mercado" como a mesma categoria (sem duplicar).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS categorias (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER NOT NULL,
+            nome       TEXT    NOT NULL COLLATE NOCASE,
+            UNIQUE (usuario_id, nome)
+        )
+    """)
 
     # Orçamentos: limite de gasto por categoria, por usuário (um por categoria).
     conn.execute("""
@@ -441,6 +459,8 @@ def index():
         "SELECT categoria, limite FROM orcamentos WHERE usuario_id = ?",
         (uid,),
     ).fetchall()
+    # Sugestões de categoria: gerenciadas + já usadas (sem repetir por caixa).
+    categorias = categorias_do_usuario(conn, uid)
     conn.close()
 
     # Meses disponíveis para o filtro (do mais recente ao mais antigo).
@@ -449,9 +469,6 @@ def index():
         {t["data"][:7] for t in todas if t["data"]} | {mes_atual},
         reverse=True,
     )
-
-    # Lista personalizada de categorias: as que o próprio usuário já usou.
-    categorias = sorted({t["categoria"] for t in todas if t["categoria"]}, key=str.lower)
 
     # Recorte do mês: alimenta os cards de resumo, o gráfico e o status de pagamento.
     if mes_sel != 'todos':
@@ -472,27 +489,32 @@ def index():
     total_pago = total_despesas - total_a_pagar
     pct_pago = (total_pago / total_despesas * 100) if total_despesas else 0
 
-    # Gastos por categoria (só DESPESA) para o gráfico
-    gastos = {}
+    # Gastos por categoria (só DESPESA), agrupados SEM diferenciar maiúsc/minúsc
+    # nem espaços — assim "Mercado", "mercado" e "Mercado " contam como uma só.
+    gasto_por_chave = {}   # categoria normalizada (lower) -> total
+    nome_por_chave = {}    # categoria normalizada -> nome de exibição (1º visto)
     for t in tx_mes:
         if t["tipo"] == "DESPESA":
-            gastos[t["categoria"]] = gastos.get(t["categoria"], 0) + t["valor"]
+            cat = (t["categoria"] or "").strip()
+            chave = cat.lower()
+            gasto_por_chave[chave] = gasto_por_chave.get(chave, 0) + t["valor"]
+            nome_por_chave.setdefault(chave, cat)
 
-    maior = max(gastos.values()) if gastos else 0
+    maior = max(gasto_por_chave.values()) if gasto_por_chave else 0
     resumo = [
         {
-            "categoria": cat,
+            "categoria": nome_por_chave[chave],
             "total": total,
             "pct_barra": (total / maior * 100) if maior else 0,
             "pct_total": (total / total_despesas * 100) if total_despesas else 0,
         }
-        for cat, total in sorted(gastos.items(), key=lambda x: x[1], reverse=True)
+        for chave, total in sorted(gasto_por_chave.items(), key=lambda x: x[1], reverse=True)
     ]
 
-    # Orçamentos: compara o gasto do mês na categoria com o limite definido.
+    # Orçamentos: compara o gasto do mês na categoria com o limite (case-insensitive).
     orcamentos_status = []
     for o in orcamentos_db:
-        gasto = gastos.get(o["categoria"], 0)
+        gasto = gasto_por_chave.get((o["categoria"] or "").strip().lower(), 0)
         limite = o["limite"]
         pct = (gasto / limite * 100) if limite else 0
         orcamentos_status.append({
@@ -808,6 +830,62 @@ def excluir_recorrente(id):
     conn.commit()
     conn.close()
     return redirect(url_for('recorrentes'))
+
+
+# ---- Categorias: gerenciar a lista de categorias ----
+
+@app.route('/categorias', methods=['GET', 'POST'])
+@login_required
+def categorias():
+    uid = session['usuario_id']
+    conn = get_db()
+
+    if request.method == 'POST':
+        nome = request.form.get('nome', '').strip()
+        if not nome:
+            flash("Digite um nome de categoria.", "erro")
+        else:
+            try:
+                conn.execute(
+                    "INSERT INTO categorias (usuario_id, nome) VALUES (?, ?)",
+                    (uid, nome),
+                )
+                conn.commit()
+                flash("Categoria criada. 🏷️", "ok")
+            except sqlite3.IntegrityError:
+                flash("Você já tem uma categoria com esse nome.", "erro")
+        conn.close()
+        return redirect(url_for('categorias'))
+
+    lista = conn.execute(
+        "SELECT * FROM categorias WHERE usuario_id = ? ORDER BY nome COLLATE NOCASE",
+        (uid,),
+    ).fetchall()
+    # Quantos lançamentos usam cada categoria (case-insensitive), para informar.
+    usos = {}
+    for r in conn.execute(
+        "SELECT categoria, COUNT(*) AS n FROM transacoes "
+        "WHERE usuario_id = ? AND categoria <> '' GROUP BY categoria COLLATE NOCASE",
+        (uid,),
+    ):
+        usos[r["categoria"].strip().lower()] = usos.get(r["categoria"].strip().lower(), 0) + r["n"]
+    conn.close()
+
+    return render_template('categorias.html', categorias=lista, usos=usos)
+
+
+@app.route('/categorias/excluir/<int:id>', methods=['POST'])
+@login_required
+def excluir_categoria(id):
+    # Remove só o item da lista gerenciada; os lançamentos existentes não mudam.
+    conn = get_db()
+    conn.execute(
+        "DELETE FROM categorias WHERE id = ? AND usuario_id = ?",
+        (id, session['usuario_id']),
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for('categorias'))
 
 
 # ---- Exportar transações em CSV (backup / análise no Excel) ----

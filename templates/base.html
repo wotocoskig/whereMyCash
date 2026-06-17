@@ -205,6 +205,7 @@
                 {% endif %}
                 <button class="icon-btn" id="btnTema" onclick="alternarTema()" title="Alternar tema">🌙</button>
                 {% if session.get('usuario_id') %}
+                    <a class="icon-btn" href="{{ url_for('trocar_senha') }}" title="Trocar senha">🔑</a>
                     <a class="icon-btn" href="{{ url_for('logout') }}" title="Sair">⏻</a>
                 {% endif %}
             </div>
@@ -216,7 +217,7 @@
                 <a href="{{ url_for('orcamentos') }}">🎯 Orçamentos</a>
                 <a href="{{ url_for('recorrentes') }}">🔁 Recorrentes</a>
                 <a href="{{ url_for('evolucao') }}">📈 Evolução</a>
-                <a href="{{ url_for('trocar_senha') }}">🔑 Senha</a>
+                <a href="{{ url_for('categorias') }}">🏷️ Categorias</a>
                 {% if eh_admin %}
                     <a href="{{ url_for('admin') }}">👑 Admin</a>
                 {% endif %}
