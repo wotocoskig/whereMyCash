@@ -265,7 +265,7 @@
                         {% endif %}
                         <a class="btn-acao" href="/editar/{{ t.id }}">✏️</a>
                         <form action="/excluir/{{ t.id }}" method="POST"
-                              onsubmit="return confirm('Excluir este lançamento?');">
+                              data-confirmar="Excluir este lançamento?" data-perigo>
                             <button type="submit" class="btn-acao">🗑️</button>
                         </form>
                     </span>

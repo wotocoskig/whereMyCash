@@ -149,6 +149,23 @@
         .cal-rodape { display: flex; justify-content: flex-end; margin-top: 8px; }
         .cal-rodape button { width: auto; margin: 0; padding: 6px 12px; border: none;
                              background: transparent; color: var(--accent); font-weight: 600; cursor: pointer; }
+        /* Modal de confirmação (substitui o confirm() nativo) */
+        .modal-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex;
+                    align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+                    opacity: 0; transition: opacity 0.18s ease; }
+        .modal-bg.aberto { opacity: 1; }
+        .modal-box { background: var(--card-bg); color: var(--text); border-radius: 16px;
+                     box-shadow: var(--shadow); padding: 24px; max-width: 360px; width: 100%;
+                     transform: translateY(8px) scale(0.98); transition: transform 0.18s ease; }
+        .modal-bg.aberto .modal-box { transform: none; }
+        .modal-msg { margin: 0 0 20px; font-size: 16px; line-height: 1.5; }
+        .modal-acoes { display: flex; gap: 10px; justify-content: flex-end; }
+        .modal-acoes button { width: auto; margin: 0; padding: 10px 16px; border-radius: 10px;
+                              cursor: pointer; font-weight: 700; }
+        .btn-sec { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-sec:hover { border-color: var(--accent); }
+        #modal-ok { background: var(--accent); color: #fff; border: none; }
+        #modal-ok.perigo { background: var(--despesa); }
         input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(85, 107, 47, 0.2); }
         .btn { background: var(--accent); color: #fff; border: none; font-weight: 700; cursor: pointer; transition: background 0.15s ease; }
         .btn:hover { background: var(--accent-hover); }
@@ -210,6 +227,17 @@
         {% endwith %}
 
         {% block conteudo %}{% endblock %}
+    </div>
+
+    <!-- Modal de confirmação (substitui o confirm() nativo) -->
+    <div id="modal" class="modal-bg" hidden>
+        <div class="modal-box" role="dialog" aria-modal="true">
+            <p class="modal-msg" id="modal-msg"></p>
+            <div class="modal-acoes">
+                <button type="button" class="btn-sec" id="modal-cancelar">Cancelar</button>
+                <button type="button" id="modal-ok">Excluir</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -369,6 +397,42 @@
             syncLabel();
         }
         document.querySelectorAll('input[type="date"]').forEach(enhanceDate);
+
+        // Modal de confirmação: intercepta forms com [data-confirmar] e só envia
+        // após o usuário confirmar (substitui o confirm() nativo).
+        (function () {
+            var modal = document.getElementById('modal');
+            var msg = document.getElementById('modal-msg');
+            var ok = document.getElementById('modal-ok');
+            var cancelar = document.getElementById('modal-cancelar');
+            var alvo = null;
+            function abrir(form) {
+                alvo = form;
+                msg.textContent = form.getAttribute('data-confirmar');
+                ok.textContent = form.getAttribute('data-acao') || 'Excluir';
+                ok.classList.toggle('perigo', form.hasAttribute('data-perigo'));
+                modal.hidden = false;
+                requestAnimationFrame(function () { modal.classList.add('aberto'); });
+                ok.focus();
+            }
+            function fechar() {
+                modal.classList.remove('aberto');
+                setTimeout(function () { modal.hidden = true; }, 180);
+                alvo = null;
+            }
+            document.querySelectorAll('form[data-confirmar]').forEach(function (f) {
+                f.addEventListener('submit', function (e) { e.preventDefault(); abrir(f); });
+            });
+            ok.addEventListener('click', function () {
+                var f = alvo; fechar();
+                if (f) f.submit();   // .submit() não dispara o listener de novo
+            });
+            cancelar.addEventListener('click', fechar);
+            modal.addEventListener('click', function (e) { if (e.target === modal) fechar(); });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && !modal.hidden) fechar();
+            });
+        })();
 
         // CSRF: injeta o token em todo formulário POST automaticamente.
         (function () {

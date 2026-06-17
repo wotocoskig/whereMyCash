@@ -35,7 +35,7 @@
                         <div class="orc-lim">Limite: R$ {{ o.limite|moeda }}</div>
                     </div>
                     <form action="{{ url_for('excluir_orcamento', id=o.id) }}" method="POST"
-                          onsubmit="return confirm('Excluir este orçamento?');" style="width: auto;">
+                          data-confirmar="Excluir este orçamento?" data-perigo style="width: auto;">
                         <button type="submit" class="btn-acao"
                                 style="width:auto; border:1px solid var(--border); background:var(--card-bg); color:var(--text); padding:7px 12px; border-radius:9px; cursor:pointer;">🗑️</button>
                     </form>

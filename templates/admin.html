@@ -41,13 +41,13 @@
             </form>
             <!-- Promover / remover admin -->
             <form action="{{ url_for('admin_promover', id=u.id) }}" method="POST"
-                  onsubmit="return confirm('{{ 'Remover admin de' if u.is_admin else 'Tornar admin' }} {{ u.username }}?');">
+                  data-confirmar="{{ 'Remover admin de' if u.is_admin else 'Tornar admin' }} {{ u.username }}?" data-acao="Confirmar">
                 <button type="submit" class="mini">{{ 'Remover admin' if u.is_admin else 'Tornar admin' }}</button>
             </form>
             <!-- Excluir usuário -->
             {% if u.id != eu %}
             <form action="{{ url_for('admin_excluir', id=u.id) }}" method="POST"
-                  onsubmit="return confirm('Excluir {{ u.username }} e TODOS os lançamentos dele? Isso não tem volta.');">
+                  data-confirmar="Excluir {{ u.username }} e TODOS os lançamentos dele? Isso não tem volta." data-perigo>
                 <button type="submit" class="mini perigo">Excluir</button>
             </form>
             {% endif %}
