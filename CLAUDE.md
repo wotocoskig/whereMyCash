@@ -65,6 +65,18 @@ Pillow foi usado só p/ gerar os ícones — NÃO é dependência de runtime.
 **Login:** username comparado com `COLLATE NOCASE` (case-insensitive) no login e na
 checagem de duplicado. Campos de senha têm botão mostrar/esconder (`verSenha`).
 
+**Valores:** `parse_valor()` aceita formato BR (vírgula decimal, ponto de milhar) e
+permite negativos (ajuste/estorno); entrada inválida → flash + redirect (não quebra).
+Inputs de valor são `text` + `inputmode=decimal`. Usado em adicionar/editar/
+orcamentos/recorrentes.
+
+**CSRF:** `before_request` gera `session['csrf']` e valida em TODO POST (senão 400).
+Um `context_processor` expõe `csrf`; o `base.html` injeta o token em todo form POST
+via JS automaticamente (logo, POST exige JS habilitado).
+
+**Extrato:** paginado (20/página, `?pagina=N` preservando filtros). Filtro de forma
+inclui `A_PAGAR` (crédito ainda não pago).
+
 **UI:** "Ganho"/"Gasto" são só rótulos de tela; no banco continuam `RECEITA`/`DESPESA`.
 A home mostra "Já pago" (débito + NULL) vs "Falta pagar" (crédito) do período, pra
 fechar o mês. O campo de forma só aparece quando o tipo é Gasto. O seletor de tipo
