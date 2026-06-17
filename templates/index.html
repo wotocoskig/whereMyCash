@@ -90,6 +90,7 @@
     <div class="card">
         <h3>➕ Nova transação</h3>
         <form action="/adicionar" method="POST">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
             <!-- Seletor de tipo: dois botões no topo -->
             <div class="toggle-tipo">
                 <input type="radio" name="tipo" id="tipo-gasto" value="DESPESA" checked onchange="toggleForma()">
@@ -259,6 +260,7 @@
                     <span class="acoes">
                         {% if t.tipo == 'DESPESA' and t.forma == 'CREDITO' %}
                             <form action="/pagar/{{ t.id }}" method="POST">
+                                <input type="hidden" name="csrf" value="{{ csrf }}">
                                 <button type="submit" class="btn-acao"
                                         title="{{ 'Marcar como a pagar' if t.pago else 'Marcar fatura como paga' }}">{{ '↩️' if t.pago else '✅' }}</button>
                             </form>
@@ -266,6 +268,7 @@
                         <a class="btn-acao" href="/editar/{{ t.id }}">✏️</a>
                         <form action="/excluir/{{ t.id }}" method="POST"
                               data-confirmar="Excluir este lançamento?" data-perigo>
+                            <input type="hidden" name="csrf" value="{{ csrf }}">
                             <button type="submit" class="btn-acao">🗑️</button>
                         </form>
                     </span>

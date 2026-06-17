@@ -217,7 +217,7 @@
                 <a href="{{ url_for('recorrentes') }}">🔁 Recorrentes</a>
                 <a href="{{ url_for('evolucao') }}">📈 Evolução</a>
                 <a href="{{ url_for('trocar_senha') }}">🔑 Senha</a>
-                {% if session.get('is_admin') %}
+                {% if eh_admin %}
                     <a href="{{ url_for('admin') }}">👑 Admin</a>
                 {% endif %}
             </nav>
@@ -329,6 +329,10 @@
             if (inp.dataset.enhanced) return;
             inp.dataset.enhanced = '1';
             inp.style.display = 'none';
+            // O input fica escondido; 'required' num campo display:none torna o
+            // submit não-focável e o navegador aborta sem aviso. O widget sempre
+            // mantém um valor e o servidor valida, então removemos o required.
+            inp.required = false;
 
             var MES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
                        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -424,16 +428,45 @@
                 alvo = null;
             }
             document.querySelectorAll('form[data-confirmar]').forEach(function (f) {
-                f.addEventListener('submit', function (e) { e.preventDefault(); abrir(f); });
+                f.addEventListener('submit', function (e) {
+                    if (f.dataset.confirmado) return;   // já confirmado: deixa enviar
+                    e.preventDefault(); abrir(f);
+                });
             });
             ok.addEventListener('click', function () {
                 var f = alvo; fechar();
-                if (f) f.submit();   // .submit() não dispara o listener de novo
+                if (!f) return;
+                // Marca como confirmado e reenvia via requestSubmit (que roda a
+                // validação HTML5 e dispara o submit; o listener acima libera).
+                f.dataset.confirmado = '1';
+                if (f.requestSubmit) f.requestSubmit(); else f.submit();
             });
             cancelar.addEventListener('click', fechar);
             modal.addEventListener('click', function (e) { if (e.target === modal) fechar(); });
             document.addEventListener('keydown', function (e) {
                 if (e.key === 'Escape' && !modal.hidden) fechar();
+            });
+        })();
+
+        // Valida o campo de valor/limite no cliente: se for inválido, bloqueia o
+        // envio e mostra um aviso (sem perder o que já foi digitado). O servidor
+        // continua validando de verdade (parse_valor).
+        (function () {
+            function valido(v) {
+                var s = (v || '').trim();
+                return !!s && /^-?[\d.,]+$/.test(s) && /\d/.test(s);
+            }
+            document.querySelectorAll('form').forEach(function (f) {
+                var campo = f.querySelector('input[name="valor"], input[name="limite"]');
+                if (!campo) return;
+                campo.addEventListener('input', function () { campo.setCustomValidity(''); });
+                f.addEventListener('submit', function (e) {
+                    if (!valido(campo.value)) {
+                        e.preventDefault();
+                        campo.setCustomValidity('Informe um número válido (ex.: 50,00).');
+                        campo.reportValidity();
+                    }
+                });
             });
         })();
 

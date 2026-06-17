@@ -14,6 +14,7 @@
         <h3>🔁 Novo recorrente</h3>
         <p class="muted" style="margin-top: -6px;">Cadastre uma vez; o lançamento é criado automaticamente todo mês.</p>
         <form action="{{ url_for('recorrentes') }}" method="POST">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
             <div class="toggle-tipo">
                 <input type="radio" name="tipo" id="tipo-gasto" value="DESPESA" checked onchange="recAtualiza()">
                 <label for="tipo-gasto" class="opt opt-gasto">➖ Gasto</label>
@@ -63,6 +64,7 @@
                     </div>
                     <form action="{{ url_for('excluir_recorrente', id=r.id) }}" method="POST"
                           data-confirmar="Excluir este recorrente? Os lançamentos já criados continuam." data-perigo style="width: auto;">
+                        <input type="hidden" name="csrf" value="{{ csrf }}">
                         <button type="submit" class="btn-acao"
                                 style="width:auto; border:1px solid var(--border); background:var(--card-bg); color:var(--text); padding:7px 12px; border-radius:9px; cursor:pointer;">🗑️</button>
                     </form>

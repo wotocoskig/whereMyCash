@@ -1,6 +1,7 @@
 import calendar
 import csv
 import io
+import math
 import os
 import secrets
 import sqlite3
@@ -56,22 +57,37 @@ def csrf_protect():
 
 
 @app.context_processor
-def inject_csrf():
-    """Disponibiliza o token CSRF para os templates."""
-    return {'csrf': session.get('csrf', '')}
+def inject_globais():
+    """Expõe o token CSRF e o status de admin (sempre fresco do banco) aos templates."""
+    eh_admin = bool('usuario_id' in session and is_admin(session['usuario_id']))
+    return {'csrf': session.get('csrf', ''), 'eh_admin': eh_admin}
 
 
 def parse_valor(texto):
     """Converte um valor digitado em float, aceitando o formato brasileiro.
 
-    Ex.: '50,00' -> 50.0 | '1.234,56' -> 1234.56 | '1234.56' -> 1234.56
-    Negativos são permitidos (ex.: ajuste/estorno). Lança ValueError se inválido.
+    Ex.: '50,00'->50.0 | '1.234,56'->1234.56 | '1.000'->1000.0 | '1.000.000'->1e6
+    Negativos são permitidos (ajuste/estorno). Rejeita vazio, texto e inf/nan.
     """
     s = (texto or '').strip()
+    if not s:
+        raise ValueError('valor vazio')
     if ',' in s:
         # vírgula = decimal; ponto = separador de milhar (padrão BR)
         s = s.replace('.', '').replace(',', '.')
-    return float(s)
+    elif s.count('.') > 1:
+        # vários pontos sem vírgula = só separadores de milhar (1.000.000)
+        s = s.replace('.', '')
+    elif '.' in s:
+        # um ponto só é ambíguo: '1.000' (milhar) vs '50.00'/'1.5' (decimal).
+        # 3 dígitos depois do ponto => milhar; senão, decimal.
+        inteiro, frac = s.rsplit('.', 1)
+        if len(frac) == 3 and inteiro.lstrip('+-').isdigit():
+            s = inteiro + frac
+    v = float(s)            # lança ValueError em texto inválido
+    if not math.isfinite(v):
+        raise ValueError('valor não finito')
+    return v
 
 
 def add_months(iso, n):
@@ -82,6 +98,24 @@ def add_months(iso, n):
     mes = total % 12 + 1
     dia = min(d.day, calendar.monthrange(ano, mes)[1])
     return date(ano, mes, dia).isoformat()
+
+
+def categorias_do_usuario(conn, uid):
+    """Lista (ordenada, sem repetir) as categorias que o usuário já usou."""
+    rows = conn.execute(
+        "SELECT DISTINCT categoria FROM transacoes "
+        "WHERE usuario_id = ? AND categoria <> '' ORDER BY categoria COLLATE NOCASE",
+        (uid,),
+    ).fetchall()
+    return [r["categoria"] for r in rows]
+
+
+def eh_ultimo_admin(conn, uid):
+    """True se o usuário é admin e é o único admin (não pode perder o status)."""
+    alvo = conn.execute("SELECT is_admin FROM users WHERE id = ?", (uid,)).fetchone()
+    if not alvo or not alvo["is_admin"]:
+        return False
+    return conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0] <= 1
 
 
 def init_db():
@@ -191,6 +225,7 @@ def gerar_recorrentes(conn, uid):
         "AND (ultimo_mes_gerado IS NULL OR ultimo_mes_gerado < ?)",
         (uid, mes_atual),
     ).fetchall()
+    gerados = 0
     for r in pendentes:
         dia = min(r["dia"], calendar.monthrange(hoje.year, hoje.month)[1])
         # Só gera quando o dia do mês já chegou — não conta valor futuro.
@@ -213,6 +248,8 @@ def gerar_recorrentes(conn, uid):
             (r["descricao"], r["valor"], r["tipo"], r["categoria"],
              data_lanc, forma, r["detalhes"], uid),
         )
+        gerados += 1
+    return gerados
 
 
 # ---- Autenticação ----
@@ -392,8 +429,10 @@ def index():
 
     conn = get_db()
     # Gera os lançamentos recorrentes do mês atual antes de ler as transações.
-    gerar_recorrentes(conn, uid)
-    conn.commit()
+    # Só faz commit (escrita) se algo foi realmente gerado — evita travar a
+    # leitura da home com uma transação de escrita à toa a cada acesso.
+    if gerar_recorrentes(conn, uid):
+        conn.commit()
     todas = conn.execute(
         "SELECT * FROM transacoes WHERE usuario_id = ? ORDER BY data DESC, id DESC",
         (uid,),
@@ -647,17 +686,12 @@ def editar(id):
     transacao = conn.execute(
         "SELECT * FROM transacoes WHERE id = ? AND usuario_id = ?", (id, uid)
     ).fetchone()
-    cats = conn.execute(
-        "SELECT DISTINCT categoria FROM transacoes "
-        "WHERE usuario_id = ? AND categoria <> '' ORDER BY categoria COLLATE NOCASE",
-        (uid,),
-    ).fetchall()
+    categorias = categorias_do_usuario(conn, uid)
     conn.close()
 
     if transacao is None:
         return redirect('/')
 
-    categorias = [c["categoria"] for c in cats]
     return render_template('editar.html', t=transacao, categorias=categorias)
 
 
@@ -690,17 +724,13 @@ def orcamentos():
         "SELECT * FROM orcamentos WHERE usuario_id = ? ORDER BY categoria COLLATE NOCASE",
         (uid,),
     ).fetchall()
-    cats = conn.execute(
-        "SELECT DISTINCT categoria FROM transacoes "
-        "WHERE usuario_id = ? AND categoria <> '' ORDER BY categoria COLLATE NOCASE",
-        (uid,),
-    ).fetchall()
+    categorias = categorias_do_usuario(conn, uid)
     conn.close()
 
     return render_template(
         'orcamentos.html',
         orcamentos=lista,
-        categorias=[c["categoria"] for c in cats],
+        categorias=categorias,
     )
 
 
@@ -757,17 +787,13 @@ def recorrentes():
         "SELECT * FROM recorrentes WHERE usuario_id = ? ORDER BY tipo, descricao COLLATE NOCASE",
         (uid,),
     ).fetchall()
-    cats = conn.execute(
-        "SELECT DISTINCT categoria FROM transacoes "
-        "WHERE usuario_id = ? AND categoria <> '' ORDER BY categoria COLLATE NOCASE",
-        (uid,),
-    ).fetchall()
+    categorias = categorias_do_usuario(conn, uid)
     conn.close()
 
     return render_template(
         'recorrentes.html',
         recorrentes=lista,
-        categorias=[c["categoria"] for c in cats],
+        categorias=categorias,
     )
 
 
@@ -946,9 +972,7 @@ def admin_excluir(id):
         return redirect(url_for('admin'))
 
     conn = get_db()
-    alvo = conn.execute("SELECT is_admin FROM users WHERE id = ?", (id,)).fetchone()
-    admins = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
-    if alvo and alvo["is_admin"] and admins <= 1:
+    if eh_ultimo_admin(conn, id):
         conn.close()
         flash("Não dá pra excluir o último admin.", "erro")
         return redirect(url_for('admin'))
@@ -971,12 +995,10 @@ def admin_promover(id):
     alvo = conn.execute("SELECT is_admin FROM users WHERE id = ?", (id,)).fetchone()
     if alvo:
         novo = 0 if alvo["is_admin"] else 1
-        if novo == 0:
-            admins = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
-            if admins <= 1:
-                conn.close()
-                flash("Não dá pra remover o último admin.", "erro")
-                return redirect(url_for('admin'))
+        if novo == 0 and eh_ultimo_admin(conn, id):
+            conn.close()
+            flash("Não dá pra remover o último admin.", "erro")
+            return redirect(url_for('admin'))
         conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (novo, id))
         conn.commit()
         if id == session['usuario_id']:

@@ -36,18 +36,21 @@
         <div class="user-acoes">
             <!-- Resetar senha -->
             <form action="{{ url_for('admin_reset_senha', id=u.id) }}" method="POST">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
                 <input type="password" name="senha" placeholder="Nova senha" minlength="4" required>
                 <button type="submit" class="mini">Resetar senha</button>
             </form>
             <!-- Promover / remover admin -->
             <form action="{{ url_for('admin_promover', id=u.id) }}" method="POST"
                   data-confirmar="{{ 'Remover admin de' if u.is_admin else 'Tornar admin' }} {{ u.username }}?" data-acao="Confirmar">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
                 <button type="submit" class="mini">{{ 'Remover admin' if u.is_admin else 'Tornar admin' }}</button>
             </form>
             <!-- Excluir usuário -->
             {% if u.id != eu %}
             <form action="{{ url_for('admin_excluir', id=u.id) }}" method="POST"
                   data-confirmar="Excluir {{ u.username }} e TODOS os lançamentos dele? Isso não tem volta." data-perigo>
+                <input type="hidden" name="csrf" value="{{ csrf }}">
                 <button type="submit" class="mini perigo">Excluir</button>
             </form>
             {% endif %}
