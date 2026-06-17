@@ -125,6 +125,30 @@
         .dd-opt:hover, .dd-opt.foco { background: var(--track); }
         .dd-opt[aria-selected="true"] { color: var(--accent); font-weight: 700; }
         .dd-check { color: var(--accent); }
+        /* Calendário customizado (no estilo do app; input[type=date] fica escondido) */
+        .cal-pop {
+            position: absolute; left: 0; top: 100%; margin-top: 6px; z-index: 30;
+            background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px;
+            box-shadow: var(--shadow); padding: 12px; width: 300px; max-width: 92vw;
+            opacity: 0; transform: translateY(-6px); pointer-events: none;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+        .cal.aberto .cal-pop { opacity: 1; transform: translateY(0); pointer-events: auto; }
+        .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .cal-titulo { font-weight: 700; }
+        .cal-nav { width: 34px; height: 34px; padding: 0; margin: 0; border: 1px solid var(--border);
+                   border-radius: 9px; background: var(--card-bg); color: var(--text); cursor: pointer; font-size: 18px; line-height: 1; }
+        .cal-nav:hover { border-color: var(--accent); }
+        .cal-semana, .cal-grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+        .cal-semana span { text-align: center; font-size: 12px; color: var(--muted); padding: 4px 0; }
+        .cal-dia { aspect-ratio: 1; border: none; margin: 0; padding: 0; background: transparent;
+                   color: var(--text); border-radius: 9px; cursor: pointer; font-size: 14px; }
+        .cal-dia:hover { background: var(--track); }
+        .cal-dia.hoje { outline: 1.5px solid var(--accent); }
+        .cal-dia.sel { background: var(--accent); color: #fff; font-weight: 700; }
+        .cal-rodape { display: flex; justify-content: flex-end; margin-top: 8px; }
+        .cal-rodape button { width: auto; margin: 0; padding: 6px 12px; border: none;
+                             background: transparent; color: var(--accent); font-weight: 600; cursor: pointer; }
         input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(85, 107, 47, 0.2); }
         .btn { background: var(--accent); color: #fff; border: none; font-weight: 700; cursor: pointer; transition: background 0.15s ease; }
         .btn:hover { background: var(--accent-hover); }
@@ -268,12 +292,83 @@
             document.querySelectorAll('.dd.aberto').forEach(function (x) { x.classList.remove('aberto'); });
         });
 
-        // Calendário: clicar em qualquer parte do campo de data abre o seletor.
-        document.querySelectorAll('input[type="date"]').forEach(function (inp) {
-            inp.addEventListener('click', function () {
-                if (inp.showPicker) { try { inp.showPicker(); } catch (e) {} }
-            });
-        });
+        // Calendário customizado: troca o input[type=date] por um popup no tema do
+        // app, mantendo o input real escondido (continua enviando a data + change).
+        function enhanceDate(inp) {
+            if (inp.dataset.enhanced) return;
+            inp.dataset.enhanced = '1';
+            inp.style.display = 'none';
+
+            var MES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+            var SEM = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+            var f2 = function (n) { return (n < 10 ? '0' : '') + n; };
+            function parse(v) { if (!v) return null; var p = v.split('-'); return { y: +p[0], m: +p[1] - 1, d: +p[2] }; }
+            function iso(y, m, d) { return y + '-' + f2(m + 1) + '-' + f2(d); }
+            function br(v) { var p = parse(v); return p ? f2(p.d) + '/' + f2(p.m + 1) + '/' + p.y : 'Selecionar'; }
+
+            var cal = document.createElement('div'); cal.className = 'dd cal';
+            var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'dd-btn';
+            var lab = document.createElement('span');
+            var arr = document.createElement('span'); arr.className = 'dd-arrow'; arr.textContent = '▾'; arr.setAttribute('aria-hidden', 'true');
+            btn.appendChild(lab); btn.appendChild(arr);
+            var pop = document.createElement('div'); pop.className = 'cal-pop';
+            cal.appendChild(btn); cal.appendChild(pop);
+            inp.parentNode.insertBefore(cal, inp.nextSibling);
+
+            var sel = parse(inp.value);
+            var hoje = new Date();
+            var view = sel ? { y: sel.y, m: sel.m } : { y: hoje.getFullYear(), m: hoje.getMonth() };
+
+            function syncLabel() { lab.textContent = br(inp.value); }
+            function escolher(y, m, d) {
+                inp.value = iso(y, m, d); sel = parse(inp.value);
+                inp.dispatchEvent(new Event('change', { bubbles: true }));
+                syncLabel(); fechar();
+            }
+            function render() {
+                pop.innerHTML = '';
+                var head = document.createElement('div'); head.className = 'cal-head';
+                var prev = document.createElement('button'); prev.type = 'button'; prev.className = 'cal-nav'; prev.textContent = '‹';
+                var tit = document.createElement('span'); tit.className = 'cal-titulo'; tit.textContent = MES[view.m] + ' de ' + view.y;
+                var next = document.createElement('button'); next.type = 'button'; next.className = 'cal-nav'; next.textContent = '›';
+                prev.onclick = function (e) { e.stopPropagation(); if (--view.m < 0) { view.m = 11; view.y--; } render(); };
+                next.onclick = function (e) { e.stopPropagation(); if (++view.m > 11) { view.m = 0; view.y++; } render(); };
+                head.appendChild(prev); head.appendChild(tit); head.appendChild(next); pop.appendChild(head);
+
+                var wk = document.createElement('div'); wk.className = 'cal-semana';
+                SEM.forEach(function (s) { var sp = document.createElement('span'); sp.textContent = s; wk.appendChild(sp); });
+                pop.appendChild(wk);
+
+                var grade = document.createElement('div'); grade.className = 'cal-grade';
+                var primeiro = new Date(view.y, view.m, 1).getDay();
+                var dias = new Date(view.y, view.m + 1, 0).getDate();
+                for (var i = 0; i < primeiro; i++) grade.appendChild(document.createElement('span'));
+                for (var d = 1; d <= dias; d++) {
+                    var c = document.createElement('button'); c.type = 'button'; c.className = 'cal-dia'; c.textContent = d;
+                    if (view.y === hoje.getFullYear() && view.m === hoje.getMonth() && d === hoje.getDate()) c.classList.add('hoje');
+                    if (sel && sel.y === view.y && sel.m === view.m && sel.d === d) c.classList.add('sel');
+                    (function (dd) { c.onclick = function (e) { e.stopPropagation(); escolher(view.y, view.m, dd); }; })(d);
+                    grade.appendChild(c);
+                }
+                pop.appendChild(grade);
+
+                var rod = document.createElement('div'); rod.className = 'cal-rodape';
+                var bh = document.createElement('button'); bh.type = 'button'; bh.textContent = 'Hoje';
+                bh.onclick = function (e) { e.stopPropagation(); var n = new Date(); escolher(n.getFullYear(), n.getMonth(), n.getDate()); };
+                rod.appendChild(bh); pop.appendChild(rod);
+            }
+            function abrir() {
+                document.querySelectorAll('.dd.aberto').forEach(function (x) { if (x !== cal) x.classList.remove('aberto'); });
+                var s = parse(inp.value); if (s) view = { y: s.y, m: s.m };
+                render(); cal.classList.add('aberto');
+            }
+            function fechar() { cal.classList.remove('aberto'); }
+            btn.onclick = function (e) { e.stopPropagation(); cal.classList.contains('aberto') ? fechar() : abrir(); };
+            inp.addEventListener('change', function () { sel = parse(inp.value); syncLabel(); });
+            syncLabel();
+        }
+        document.querySelectorAll('input[type="date"]').forEach(enhanceDate);
 
         // CSRF: injeta o token em todo formulário POST automaticamente.
         (function () {
