@@ -100,6 +100,22 @@ def add_months(iso, n):
     return date(ano, mes, dia).isoformat()
 
 
+def registrar_categoria(conn, uid, nome):
+    """Cadastra a categoria na lista do usuário se ainda não existir.
+
+    Permite "criar" categoria só digitando num formulário (lançamento, orçamento,
+    recorrente) — sem precisar abrir a página de Categorias. O UNIQUE COLLATE
+    NOCASE evita duplicar por maiúsc/minúsc; INSERT OR IGNORE ignora repetidas.
+    Não faz commit (quem chama decide).
+    """
+    nome = (nome or '').strip()
+    if nome:
+        conn.execute(
+            "INSERT OR IGNORE INTO categorias (usuario_id, nome) VALUES (?, ?)",
+            (uid, nome),
+        )
+
+
 def categorias_do_usuario(conn, uid):
     """Lista de categorias para sugestão: as gerenciadas + as já usadas em
     lançamentos, sem repetir (ignora maiúsc/minúsc) e em ordem alfabética."""
@@ -615,6 +631,7 @@ def adicionar():
             parcelas = 1
 
     conn = get_db()
+    registrar_categoria(conn, uid, categoria)
     if parcelas > 1:
         # Divide o valor em N parcelas; a sobra de centavos vai pra 1ª parcela.
         base = round(valor / parcelas, 2)
@@ -686,6 +703,8 @@ def editar(id):
             conn.close()
             flash("Valor inválido. Use números (ex.: 50,00).", "erro")
             return redirect(url_for('editar', id=id))
+        categoria = request.form.get('categoria', '').strip()
+        registrar_categoria(conn, uid, categoria)
         conn.execute(
             "UPDATE transacoes SET descricao = ?, valor = ?, tipo = ?, "
             "categoria = ?, data = ?, forma = ?, detalhes = ? WHERE id = ? AND usuario_id = ?",
@@ -693,7 +712,7 @@ def editar(id):
                 request.form.get('descricao', '').strip(),
                 valor,
                 tipo,
-                request.form.get('categoria', '').strip(),
+                categoria,
                 request.form.get('data') or date.today().isoformat(),
                 forma,
                 detalhes,
@@ -730,6 +749,7 @@ def orcamentos():
         except (ValueError, TypeError):
             limite = 0
         if categoria and limite > 0:
+            registrar_categoria(conn, uid, categoria)
             # Upsert: um limite por categoria do usuário.
             conn.execute(
                 "INSERT INTO orcamentos (usuario_id, categoria, limite) VALUES (?, ?, ?) "
@@ -791,6 +811,7 @@ def recorrentes():
             dia = 1
 
         if descricao and categoria and valor > 0:
+            registrar_categoria(conn, uid, categoria)
             conn.execute(
                 "INSERT INTO recorrentes (usuario_id, descricao, valor, tipo, categoria, forma, detalhes, dia) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",

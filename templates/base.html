@@ -101,6 +101,7 @@
         /* Dropdown customizado (substitui o <select> visualmente; o select real
            fica escondido mas continua enviando o valor no formulário). */
         .dd { position: relative; margin: 6px 0; }
+        .dd.combo input { margin: 0; }
         .dd-btn {
             width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
             padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px;
@@ -323,6 +324,48 @@
         document.addEventListener('click', function () {
             document.querySelectorAll('.dd.aberto').forEach(function (x) { x.classList.remove('aberto'); });
         });
+
+        // Combobox: input de categoria (com datalist) vira um campo que abre a
+        // lista das categorias no estilo do app — clica e vê tudo, digita e filtra,
+        // e ainda pode digitar uma nova (cria ao salvar). Progressive enhancement.
+        function enhanceCombobox(inp) {
+            if (inp.dataset.combo) return;
+            inp.dataset.combo = '1';
+            var listId = inp.getAttribute('list');
+            var dl = listId ? document.getElementById(listId) : null;
+            var opcoes = dl ? Array.prototype.map.call(dl.options, function (o) { return o.value; }) : [];
+            inp.removeAttribute('list');   // desliga o popup nativo
+
+            var wrap = document.createElement('div'); wrap.className = 'dd combo';
+            inp.parentNode.insertBefore(wrap, inp); wrap.appendChild(inp);
+            var lista = document.createElement('ul'); lista.className = 'dd-list'; wrap.appendChild(lista);
+
+            function render() {
+                var termo = inp.value.trim().toLowerCase();
+                var filtradas = opcoes.filter(function (o) { return o.toLowerCase().indexOf(termo) !== -1; });
+                lista.innerHTML = '';
+                if (!filtradas.length) { wrap.classList.remove('aberto'); return; }
+                filtradas.forEach(function (o) {
+                    var li = document.createElement('li'); li.className = 'dd-opt'; li.textContent = o;
+                    // mousedown roda antes do blur, então pega o clique na opção.
+                    li.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        inp.value = o;
+                        wrap.classList.remove('aberto');
+                        inp.dispatchEvent(new Event('input', { bubbles: true }));
+                    });
+                    lista.appendChild(li);
+                });
+                wrap.classList.add('aberto');
+            }
+            wrap.addEventListener('click', function (e) { e.stopPropagation(); });
+            inp.addEventListener('focus', render);
+            inp.addEventListener('input', render);
+            inp.addEventListener('blur', function () {
+                setTimeout(function () { wrap.classList.remove('aberto'); }, 150);
+            });
+        }
+        document.querySelectorAll('input[list]').forEach(enhanceCombobox);
 
         // Calendário customizado: troca o input[type=date] por um popup no tema do
         // app, mantendo o input real escondido (continua enviando a data + change).
