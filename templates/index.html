@@ -115,8 +115,8 @@
         </form>
     </div>
 
-    <!-- Status de pagamento dos gastos -->
-    {% if total_despesas > 0 %}
+    <!-- Status de pagamento dos gastos (conceito mensal: oculto em "Todos os meses") -->
+    {% if mes_sel != 'todos' and total_despesas > 0 %}
     <div class="card">
         <h3>💳 Pagamentos do período</h3>
         <div class="pagto-linha">
@@ -169,8 +169,8 @@
         {% endif %}
     </div>
 
-    <!-- Acompanhamento de orçamentos -->
-    {% if orcamentos %}
+    <!-- Acompanhamento de orçamentos (conceito mensal: oculto em "Todos os meses") -->
+    {% if mes_sel != 'todos' and orcamentos %}
     <div class="card">
         <h3>🎯 Orçamentos do mês</h3>
         <ul class="grafico">

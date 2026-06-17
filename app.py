@@ -130,10 +130,13 @@ def init_db():
 
 
 def gerar_recorrentes(conn, uid):
-    """Cria a transação do mês atual para cada recorrente ainda não gerado.
+    """Cria a transação do mês atual para cada recorrente cujo dia já chegou.
 
     Usa a mesma conexão da chamada. Não faz commit (quem chama decide).
     Comparação 'AAAA-MM' funciona como ordem cronológica (lexicográfica).
+    Só gera a partir do dia configurado (não lança valor futuro) e usa um
+    "claim" atômico (UPDATE condicional + rowcount) para evitar duplicar
+    o lançamento quando dois acessos simultâneos rodam ao mesmo tempo.
     """
     hoje = date.today()
     mes_atual = hoje.strftime("%Y-%m")
@@ -144,6 +147,18 @@ def gerar_recorrentes(conn, uid):
     ).fetchall()
     for r in pendentes:
         dia = min(r["dia"], calendar.monthrange(hoje.year, hoje.month)[1])
+        # Só gera quando o dia do mês já chegou — não conta valor futuro.
+        if hoje.day < dia:
+            continue
+        # Claim atômico: marca como gerado só se ninguém marcou ainda este mês.
+        # Se outro request já gerou (rowcount 0), não duplica o lançamento.
+        claimed = conn.execute(
+            "UPDATE recorrentes SET ultimo_mes_gerado = ? "
+            "WHERE id = ? AND (ultimo_mes_gerado IS NULL OR ultimo_mes_gerado < ?)",
+            (mes_atual, r["id"], mes_atual),
+        ).rowcount
+        if not claimed:
+            continue
         data_lanc = date(hoje.year, hoje.month, dia).isoformat()
         forma = r["forma"] if r["tipo"] == "DESPESA" else None
         conn.execute(
@@ -151,10 +166,6 @@ def gerar_recorrentes(conn, uid):
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (r["descricao"], r["valor"], r["tipo"], r["categoria"],
              data_lanc, forma, r["detalhes"], uid),
-        )
-        conn.execute(
-            "UPDATE recorrentes SET ultimo_mes_gerado = ? WHERE id = ?",
-            (mes_atual, r["id"]),
         )
 
 
@@ -301,7 +312,10 @@ def moeda(valor):
 @app.route('/')
 @login_required
 def index():
-    mes_sel = request.args.get('mes', 'todos')
+    # Padrão = mês atual (orçamento e fatura são conceitos mensais). 'todos'
+    # continua disponível no filtro para a visão de longo prazo.
+    mes_atual = date.today().strftime("%Y-%m")
+    mes_sel = request.args.get('mes', mes_atual)
     uid = session['usuario_id']
 
     conn = get_db()
@@ -318,8 +332,12 @@ def index():
     ).fetchall()
     conn.close()
 
-    # Meses disponíveis para o filtro (do mais recente ao mais antigo)
-    meses = sorted({t["data"][:7] for t in todas if t["data"]}, reverse=True)
+    # Meses disponíveis para o filtro (do mais recente ao mais antigo).
+    # Inclui sempre o mês atual, mesmo que ainda não haja lançamentos nele.
+    meses = sorted(
+        {t["data"][:7] for t in todas if t["data"]} | {mes_atual},
+        reverse=True,
+    )
 
     # Lista personalizada de categorias: as que o próprio usuário já usou.
     categorias = sorted({t["categoria"] for t in todas if t["categoria"]}, key=str.lower)
@@ -424,10 +442,10 @@ def index():
 @app.route('/adicionar', methods=['POST'])
 @login_required
 def adicionar():
-    descricao = request.form['descricao']
+    descricao = request.form['descricao'].strip()
     valor = float(request.form['valor'])
     tipo = request.form['tipo']
-    categoria = request.form['categoria']
+    categoria = request.form['categoria'].strip()
     data_lanc = request.form.get('data') or date.today().isoformat()
     # Forma de pagamento só faz sentido para gastos; ganhos ficam NULL.
     forma = request.form.get('forma') if tipo == 'DESPESA' else None
@@ -497,10 +515,10 @@ def editar(id):
             "UPDATE transacoes SET descricao = ?, valor = ?, tipo = ?, "
             "categoria = ?, data = ?, forma = ?, detalhes = ? WHERE id = ? AND usuario_id = ?",
             (
-                request.form['descricao'],
+                request.form['descricao'].strip(),
                 float(request.form['valor']),
                 tipo,
-                request.form['categoria'],
+                request.form['categoria'].strip(),
                 request.form.get('data') or date.today().isoformat(),
                 forma,
                 detalhes,
