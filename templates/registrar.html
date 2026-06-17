@@ -12,10 +12,16 @@
                minlength="3" required autofocus>
 
         <label for="senha">Senha</label>
-        <input type="password" id="senha" name="senha" minlength="4" required>
+        <div class="senha-wrap">
+            <input type="password" id="senha" name="senha" minlength="4" required>
+            <button type="button" class="ver-senha" onclick="verSenha(this)" aria-label="Mostrar senha">👁️</button>
+        </div>
 
         <label for="senha2">Repita a senha</label>
-        <input type="password" id="senha2" name="senha2" minlength="4" required>
+        <div class="senha-wrap">
+            <input type="password" id="senha2" name="senha2" minlength="4" required>
+            <button type="button" class="ver-senha" onclick="verSenha(this)" aria-label="Mostrar senha">👁️</button>
+        </div>
 
         <button type="submit" class="btn" style="margin-top: 12px;">Criar conta</button>
     </form>

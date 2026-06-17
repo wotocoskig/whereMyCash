@@ -11,7 +11,10 @@
         <input type="text" id="username" name="username" value="{{ username or '' }}" required autofocus>
 
         <label for="senha">Senha</label>
-        <input type="password" id="senha" name="senha" required>
+        <div class="senha-wrap">
+            <input type="password" id="senha" name="senha" required>
+            <button type="button" class="ver-senha" onclick="verSenha(this)" aria-label="Mostrar senha">👁️</button>
+        </div>
 
         <button type="submit" class="btn" style="margin-top: 12px;">Entrar</button>
     </form>

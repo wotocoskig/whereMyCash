@@ -7,13 +7,22 @@
 
     <form action="{{ url_for('trocar_senha') }}" method="POST">
         <label for="atual">Senha atual</label>
-        <input type="password" id="atual" name="atual" required autofocus>
+        <div class="senha-wrap">
+            <input type="password" id="atual" name="atual" required autofocus>
+            <button type="button" class="ver-senha" onclick="verSenha(this)" aria-label="Mostrar senha">👁️</button>
+        </div>
 
         <label for="nova">Nova senha</label>
-        <input type="password" id="nova" name="nova" minlength="4" required>
+        <div class="senha-wrap">
+            <input type="password" id="nova" name="nova" minlength="4" required>
+            <button type="button" class="ver-senha" onclick="verSenha(this)" aria-label="Mostrar senha">👁️</button>
+        </div>
 
         <label for="nova2">Repita a nova senha</label>
-        <input type="password" id="nova2" name="nova2" minlength="4" required>
+        <div class="senha-wrap">
+            <input type="password" id="nova2" name="nova2" minlength="4" required>
+            <button type="button" class="ver-senha" onclick="verSenha(this)" aria-label="Mostrar senha">👁️</button>
+        </div>
 
         <button type="submit" class="btn" style="margin-top: 12px;">Salvar nova senha</button>
     </form>
