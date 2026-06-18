@@ -5,7 +5,7 @@ import math
 import os
 import secrets
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 
 from flask import (
@@ -141,6 +141,16 @@ def eh_ultimo_admin(conn, uid):
     return conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0] <= 1
 
 
+def registrar_auditoria(conn, acao, detalhe):
+    """Registra uma ação administrativa (quem fez, o quê, quando). Sem commit."""
+    conn.execute(
+        "INSERT INTO auditoria (admin_id, admin_nome, acao, detalhe, quando) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (session.get('usuario_id'), session.get('usuario_nome'), acao, detalhe,
+         datetime.now().strftime('%Y-%m-%d %H:%M')),
+    )
+
+
 def init_db():
     """Cria/atualiza as tabelas. Idempotente — pode rodar a cada importação."""
     conn = get_db()
@@ -189,11 +199,19 @@ def init_db():
     if "pago" not in colunas:
         # Para gastos no CRÉDITO: 1 = fatura já paga; 0 = ainda a pagar.
         conn.execute("ALTER TABLE transacoes ADD COLUMN pago INTEGER NOT NULL DEFAULT 0")
+    if "grupo" not in colunas:
+        # Identifica as parcelas de uma mesma compra (mesmo grupo). NULL = avulso.
+        conn.execute("ALTER TABLE transacoes ADD COLUMN grupo TEXT")
 
     # Admin: marca o usuário com privilégio de administração.
     ucols = [c["name"] for c in conn.execute("PRAGMA table_info(users)")]
     if "is_admin" not in ucols:
         conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+    if "falhas" not in ucols:
+        # Controle anti-força-bruta: tentativas de login falhas e bloqueio temporário.
+        conn.execute("ALTER TABLE users ADD COLUMN falhas INTEGER NOT NULL DEFAULT 0")
+    if "bloqueio_ate" not in ucols:
+        conn.execute("ALTER TABLE users ADD COLUMN bloqueio_ate TEXT")
     # Garante ao menos um admin: promove o usuário mais antigo se não houver nenhum.
     tem_admin = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
     total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
@@ -220,6 +238,18 @@ def init_db():
             categoria  TEXT    NOT NULL,
             limite     REAL    NOT NULL,
             UNIQUE (usuario_id, categoria)
+        )
+    """)
+
+    # Auditoria: registro simples das ações administrativas (quem, o quê, quando).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS auditoria (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_id   INTEGER,
+            admin_nome TEXT,
+            acao       TEXT NOT NULL,
+            detalhe    TEXT,
+            quando     TEXT NOT NULL
         )
     """)
 
@@ -384,17 +414,45 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         senha = request.form.get('senha', '')
+        MAX_FALHAS, BLOQUEIO_MIN = 5, 5
+        FMT = '%Y-%m-%d %H:%M:%S'
+        agora = datetime.now()
 
         conn = get_db()
         # COLLATE NOCASE: aceita o nome em qualquer caixa (não tranca o usuário fora).
         user = conn.execute(
             "SELECT * FROM users WHERE username = ? COLLATE NOCASE", (username,)
         ).fetchone()
-        conn.close()
+
+        # Bloqueio temporário após muitas tentativas (anti-força-bruta).
+        if user and user["bloqueio_ate"]:
+            try:
+                ate = datetime.strptime(user["bloqueio_ate"], FMT)
+            except (ValueError, TypeError):
+                ate = None
+            if ate and ate > agora:
+                conn.close()
+                flash("Muitas tentativas. Tente novamente em alguns minutos.", "erro")
+                return render_template('login.html', username=username)
 
         if user is None or not check_password_hash(user["senha_hash"], senha):
+            if user:
+                falhas = (user["falhas"] or 0) + 1
+                if falhas >= MAX_FALHAS:
+                    bloq = (agora + timedelta(minutes=BLOQUEIO_MIN)).strftime(FMT)
+                    conn.execute("UPDATE users SET falhas = ?, bloqueio_ate = ? WHERE id = ?",
+                                 (falhas, bloq, user["id"]))
+                else:
+                    conn.execute("UPDATE users SET falhas = ? WHERE id = ?", (falhas, user["id"]))
+                conn.commit()
+            conn.close()
             flash("Usuário ou senha inválidos.", "erro")
             return render_template('login.html', username=username)
+
+        # Sucesso: zera o contador de tentativas.
+        conn.execute("UPDATE users SET falhas = 0, bloqueio_ate = NULL WHERE id = ?", (user["id"],))
+        conn.commit()
+        conn.close()
 
         session['usuario_id'] = user["id"]
         session['usuario_nome'] = user["username"]
@@ -614,6 +672,9 @@ def adicionar():
     except (ValueError, TypeError):
         flash("Valor inválido. Use números (ex.: 50,00).", "erro")
         return redirect('/')
+    if valor == 0:
+        flash("O valor não pode ser zero.", "erro")
+        return redirect('/')
     tipo = request.form.get('tipo', 'DESPESA')
     categoria = request.form.get('categoria', '').strip()
     data_lanc = request.form.get('data') or date.today().isoformat()
@@ -626,24 +687,30 @@ def adicionar():
     parcelas = 1
     if tipo == 'DESPESA' and forma == 'CREDITO':
         try:
-            parcelas = max(1, min(60, int(request.form.get('parcelas', '1'))))
+            parcelas = int((request.form.get('parcelas', '1') or '1').strip())
         except ValueError:
-            parcelas = 1
+            flash("Número de parcelas inválido.", "erro")
+            return redirect('/')
+        if parcelas < 1 or parcelas > 60:
+            flash("As parcelas devem ser um número de 1 a 60.", "erro")
+            return redirect('/')
 
     conn = get_db()
     registrar_categoria(conn, uid, categoria)
     if parcelas > 1:
         # Divide o valor em N parcelas; a sobra de centavos vai pra 1ª parcela.
+        # Todas compartilham o mesmo 'grupo' (permite excluir a compra inteira).
+        grupo = secrets.token_hex(8)
         base = round(valor / parcelas, 2)
         sobra = round(valor - base * parcelas, 2)
         for i in range(parcelas):
             v = round(base + sobra, 2) if i == 0 else base
             conn.execute(
-                "INSERT INTO transacoes (descricao, valor, tipo, categoria, data, forma, detalhes, usuario_id) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO transacoes (descricao, valor, tipo, categoria, data, forma, detalhes, usuario_id, grupo) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     f"{descricao} ({i + 1}/{parcelas})",
-                    v, tipo, categoria, add_months(data_lanc, i), forma, detalhes, uid,
+                    v, tipo, categoria, add_months(data_lanc, i), forma, detalhes, uid, grupo,
                 ),
             )
     else:
@@ -676,15 +743,27 @@ def pagar(id):
 @app.route('/excluir/<int:id>', methods=['POST'])
 @login_required
 def excluir(id):
+    uid = session['usuario_id']
+    escopo = request.form.get('escopo', 'esta')
     conn = get_db()
     # O filtro por usuario_id impede excluir transação de outra pessoa.
-    conn.execute(
-        "DELETE FROM transacoes WHERE id = ? AND usuario_id = ?",
-        (id, session['usuario_id']),
-    )
+    if escopo == 'todas':
+        # Exclui todas as parcelas da mesma compra (mesmo grupo), se houver.
+        alvo = conn.execute(
+            "SELECT grupo FROM transacoes WHERE id = ? AND usuario_id = ?", (id, uid)
+        ).fetchone()
+        if alvo and alvo["grupo"]:
+            conn.execute(
+                "DELETE FROM transacoes WHERE grupo = ? AND usuario_id = ?",
+                (alvo["grupo"], uid),
+            )
+        else:
+            conn.execute("DELETE FROM transacoes WHERE id = ? AND usuario_id = ?", (id, uid))
+    else:
+        conn.execute("DELETE FROM transacoes WHERE id = ? AND usuario_id = ?", (id, uid))
     conn.commit()
     conn.close()
-    return redirect('/')
+    return redirect(request.referrer or '/')
 
 
 @app.route('/editar/<int:id>', methods=['GET', 'POST'])
@@ -702,6 +781,10 @@ def editar(id):
         except (ValueError, TypeError):
             conn.close()
             flash("Valor inválido. Use números (ex.: 50,00).", "erro")
+            return redirect(url_for('editar', id=id))
+        if valor == 0:
+            conn.close()
+            flash("O valor não pode ser zero.", "erro")
             return redirect(url_for('editar', id=id))
         categoria = request.form.get('categoria', '').strip()
         registrar_categoria(conn, uid, categoria)
@@ -745,20 +828,25 @@ def orcamentos():
     if request.method == 'POST':
         categoria = request.form.get('categoria', '').strip()
         try:
-            limite = parse_valor(request.form.get('limite', '0'))
+            limite = parse_valor(request.form.get('limite', ''))
         except (ValueError, TypeError):
-            limite = 0
-        if categoria and limite > 0:
+            limite = None
+        if not categoria:
+            flash("Informe uma categoria.", "erro")
+        elif limite is None:
+            flash("Limite inválido. Use números (ex.: 600,00).", "erro")
+        elif limite <= 0:
+            flash("O limite deve ser maior que zero.", "erro")
+        else:
             registrar_categoria(conn, uid, categoria)
-            # Upsert: um limite por categoria do usuário.
+            # Upsert: um limite por categoria do usuário (edita se já existir).
             conn.execute(
                 "INSERT INTO orcamentos (usuario_id, categoria, limite) VALUES (?, ?, ?) "
                 "ON CONFLICT (usuario_id, categoria) DO UPDATE SET limite = excluded.limite",
                 (uid, categoria, limite),
             )
             conn.commit()
-        else:
-            flash("Informe uma categoria e um limite maior que zero.", "erro")
+            flash("Orçamento salvo. 🎯", "ok")
         conn.close()
         return redirect(url_for('orcamentos'))
 
@@ -766,13 +854,35 @@ def orcamentos():
         "SELECT * FROM orcamentos WHERE usuario_id = ? ORDER BY categoria COLLATE NOCASE",
         (uid,),
     ).fetchall()
+    # Gasto do MÊS ATUAL por categoria (case-insensitive) para a barra de progresso.
+    mes_atual = date.today().strftime("%Y-%m")
+    gasto_por_chave = {}
+    for t in conn.execute(
+        "SELECT categoria, valor FROM transacoes "
+        "WHERE usuario_id = ? AND tipo = 'DESPESA' AND data LIKE ?",
+        (uid, mes_atual + '%'),
+    ):
+        chave = (t["categoria"] or "").strip().lower()
+        gasto_por_chave[chave] = gasto_por_chave.get(chave, 0) + t["valor"]
     categorias = categorias_do_usuario(conn, uid)
     conn.close()
 
+    orcamentos_lista = []
+    for o in lista:
+        gasto = gasto_por_chave.get(o["categoria"].strip().lower(), 0)
+        limite = o["limite"]
+        pct = (gasto / limite * 100) if limite else 0
+        orcamentos_lista.append({
+            "id": o["id"], "categoria": o["categoria"], "limite": limite,
+            "gasto": gasto, "pct": pct, "pct_barra": min(pct, 100),
+            "estourou": gasto > limite, "restante": limite - gasto,
+        })
+
     return render_template(
         'orcamentos.html',
-        orcamentos=lista,
+        orcamentos=orcamentos_lista,
         categorias=categorias,
+        mes_atual=mes_atual,
     )
 
 
@@ -801,16 +911,29 @@ def recorrentes():
         tipo = request.form.get('tipo', 'DESPESA')
         forma = request.form.get('forma') if tipo == 'DESPESA' else None
         detalhes = request.form.get('detalhes', '').strip() or None
+        # Validação no servidor com mensagens claras.
         try:
-            valor = parse_valor(request.form.get('valor', '0'))
+            valor = parse_valor(request.form.get('valor', ''))
         except (ValueError, TypeError):
-            valor = 0
+            valor = None
         try:
-            dia = max(1, min(31, int(request.form.get('dia', '1'))))
-        except ValueError:
-            dia = 1
+            dia = int(request.form.get('dia', ''))
+        except (ValueError, TypeError):
+            dia = None
 
-        if descricao and categoria and valor > 0:
+        erro = None
+        if not descricao or not categoria:
+            erro = "Preencha descrição e categoria."
+        elif valor is None:
+            erro = "Valor inválido. Use números (ex.: 50,00)."
+        elif valor == 0:
+            erro = "O valor não pode ser zero."
+        elif dia is None or dia < 1 or dia > 31:
+            erro = "O dia do mês deve ser um número de 1 a 31."
+
+        if erro:
+            flash(erro, "erro")
+        else:
             registrar_categoria(conn, uid, categoria)
             conn.execute(
                 "INSERT INTO recorrentes (usuario_id, descricao, valor, tipo, categoria, forma, detalhes, dia) "
@@ -821,8 +944,6 @@ def recorrentes():
             gerar_recorrentes(conn, uid)
             conn.commit()
             flash("Recorrente criado! O lançamento deste mês já foi gerado. 🔁", "ok")
-        else:
-            flash("Preencha descrição, categoria e um valor maior que zero.", "erro")
         conn.close()
         return redirect(url_for('recorrentes'))
 
@@ -1050,8 +1171,12 @@ def admin():
         FROM users u
         ORDER BY u.username COLLATE NOCASE
     """).fetchall()
+    auditoria = conn.execute(
+        "SELECT * FROM auditoria ORDER BY id DESC LIMIT 20"
+    ).fetchall()
     conn.close()
-    return render_template('admin.html', usuarios=usuarios, eu=session['usuario_id'])
+    return render_template('admin.html', usuarios=usuarios, auditoria=auditoria,
+                           eu=session['usuario_id'])
 
 
 @app.route('/admin/reset-senha/<int:id>', methods=['POST'])
@@ -1060,15 +1185,18 @@ def admin_reset_senha(id):
     nova = request.form.get('senha', '')
     if len(nova) < 4:
         flash("A nova senha precisa ter pelo menos 4 caracteres.", "erro")
-    else:
-        conn = get_db()
-        conn.execute(
-            "UPDATE users SET senha_hash = ? WHERE id = ?",
-            (generate_password_hash(nova), id),
-        )
-        conn.commit()
-        conn.close()
-        flash("Senha redefinida.", "ok")
+        return redirect(url_for('admin'))
+    conn = get_db()
+    alvo = conn.execute("SELECT username FROM users WHERE id = ?", (id,)).fetchone()
+    # Redefine a senha e também limpa o bloqueio por tentativas (desbloqueia).
+    conn.execute(
+        "UPDATE users SET senha_hash = ?, falhas = 0, bloqueio_ate = NULL WHERE id = ?",
+        (generate_password_hash(nova), id),
+    )
+    registrar_auditoria(conn, "Resetou senha", "usuário " + (alvo["username"] if alvo else str(id)))
+    conn.commit()
+    conn.close()
+    flash("Senha redefinida.", "ok")
     return redirect(url_for('admin'))
 
 
@@ -1085,11 +1213,14 @@ def admin_excluir(id):
         flash("Não dá pra excluir o último admin.", "erro")
         return redirect(url_for('admin'))
 
+    alvo = conn.execute("SELECT username FROM users WHERE id = ?", (id,)).fetchone()
     # Remove o usuário e tudo que pertence a ele.
     conn.execute("DELETE FROM transacoes WHERE usuario_id = ?", (id,))
     conn.execute("DELETE FROM orcamentos WHERE usuario_id = ?", (id,))
     conn.execute("DELETE FROM recorrentes WHERE usuario_id = ?", (id,))
+    conn.execute("DELETE FROM categorias WHERE usuario_id = ?", (id,))
     conn.execute("DELETE FROM users WHERE id = ?", (id,))
+    registrar_auditoria(conn, "Excluiu usuário", alvo["username"] if alvo else str(id))
     conn.commit()
     conn.close()
     flash("Usuário excluído.", "ok")
@@ -1100,7 +1231,7 @@ def admin_excluir(id):
 @admin_required
 def admin_promover(id):
     conn = get_db()
-    alvo = conn.execute("SELECT is_admin FROM users WHERE id = ?", (id,)).fetchone()
+    alvo = conn.execute("SELECT username, is_admin FROM users WHERE id = ?", (id,)).fetchone()
     if alvo:
         novo = 0 if alvo["is_admin"] else 1
         if novo == 0 and eh_ultimo_admin(conn, id):
@@ -1108,6 +1239,7 @@ def admin_promover(id):
             flash("Não dá pra remover o último admin.", "erro")
             return redirect(url_for('admin'))
         conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (novo, id))
+        registrar_auditoria(conn, "Tornou admin" if novo else "Removeu admin", alvo["username"])
         conn.commit()
         if id == session['usuario_id']:
             session['is_admin'] = novo

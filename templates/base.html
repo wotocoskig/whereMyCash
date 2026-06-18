@@ -287,6 +287,7 @@
             <p class="modal-msg" id="modal-msg"></p>
             <div class="modal-acoes">
                 <button type="button" class="btn-sec" id="modal-cancelar">Cancelar</button>
+                <button type="button" class="btn-sec" id="modal-extra" hidden></button>
                 <button type="button" id="modal-ok">Excluir</button>
             </div>
         </div>
@@ -394,22 +395,23 @@
                 if (!filtradas.length) { wrap.classList.remove('aberto'); return; }
                 filtradas.forEach(function (o) {
                     var li = document.createElement('li'); li.className = 'dd-opt'; li.textContent = o;
+                    // mousedown roda ANTES do blur e preventDefault mantém o foco no
+                    // campo; preenche só a categoria e fecha (sem reabrir a lista).
                     li.addEventListener('mousedown', function (e) {
                         e.preventDefault();
                         inp.value = o;
                         wrap.classList.remove('aberto');
-                        inp.dispatchEvent(new Event('input', { bubbles: true }));
                     });
                     lista.appendChild(li);
                 });
                 wrap.classList.add('aberto');
             }
-            wrap.addEventListener('click', function (e) { e.stopPropagation(); });
+            wrap.addEventListener('mousedown', function (e) { e.stopPropagation(); });
             inp.addEventListener('focus', render);
             inp.addEventListener('input', render);
-            inp.addEventListener('blur', function () {
-                setTimeout(function () { wrap.classList.remove('aberto'); }, 150);
-            });
+            // Fecha imediatamente ao sair do campo (clicar em outro campo/fora):
+            // como a seleção usa mousedown, ela já ocorreu antes deste blur.
+            inp.addEventListener('blur', function () { wrap.classList.remove('aberto'); });
         }
         document.querySelectorAll('input[list]').forEach(enhanceCombobox);
 
@@ -492,10 +494,13 @@
         document.querySelectorAll('input[type="date"]').forEach(enhanceDate);
 
         // Modal de confirmação: intercepta forms com [data-confirmar].
+        // Forms com [data-extra] ganham um 2º botão (ex.: "todas as parcelas"),
+        // que envia o form com um campo escopo=todas (o principal envia esta).
         (function () {
             var modal = document.getElementById('modal');
             var msg = document.getElementById('modal-msg');
             var ok = document.getElementById('modal-ok');
+            var extra = document.getElementById('modal-extra');
             var cancelar = document.getElementById('modal-cancelar');
             var alvo = null;
             function abrir(form) {
@@ -503,6 +508,9 @@
                 msg.textContent = form.getAttribute('data-confirmar');
                 ok.textContent = form.getAttribute('data-acao') || 'Excluir';
                 ok.classList.toggle('perigo', form.hasAttribute('data-perigo'));
+                var ex = form.getAttribute('data-extra');
+                extra.hidden = !ex;
+                if (ex) extra.textContent = ex;
                 modal.hidden = false;
                 requestAnimationFrame(function () { modal.classList.add('aberto'); });
                 ok.focus();
@@ -510,7 +518,19 @@
             function fechar() {
                 modal.classList.remove('aberto');
                 setTimeout(function () { modal.hidden = true; }, 180);
+                extra.hidden = true;
                 alvo = null;
+            }
+            function submeter(escopo) {
+                var f = alvo; fechar();
+                if (!f) return;
+                f.dataset.confirmado = '1';
+                if (escopo) {
+                    var i = f.querySelector('input[name="escopo"]');
+                    if (!i) { i = document.createElement('input'); i.type = 'hidden'; i.name = 'escopo'; f.appendChild(i); }
+                    i.value = escopo;
+                }
+                if (f.requestSubmit) f.requestSubmit(); else f.submit();
             }
             document.querySelectorAll('form[data-confirmar]').forEach(function (f) {
                 f.addEventListener('submit', function (e) {
@@ -518,12 +538,8 @@
                     e.preventDefault(); abrir(f);
                 });
             });
-            ok.addEventListener('click', function () {
-                var f = alvo; fechar();
-                if (!f) return;
-                f.dataset.confirmado = '1';
-                if (f.requestSubmit) f.requestSubmit(); else f.submit();
-            });
+            ok.addEventListener('click', function () { submeter('esta'); });
+            extra.addEventListener('click', function () { submeter('todas'); });
             cancelar.addEventListener('click', fechar);
             modal.addEventListener('click', function (e) { if (e.target === modal) fechar(); });
             document.addEventListener('keydown', function (e) {

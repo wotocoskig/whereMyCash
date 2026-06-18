@@ -55,4 +55,22 @@
     </div>
     {% endfor %}
 </div>
+
+<div class="card">
+    <h3 class="sec-h"><i class="ti ti-history"></i> Auditoria</h3>
+    <p class="sec-sub">Últimas ações administrativas (quem, o quê, quando).</p>
+    {% if auditoria %}
+        {% for a in auditoria %}
+        <div class="li-row">
+            <span class="li-ic"><i class="ti ti-point"></i></span>
+            <div class="li-info">
+                <div class="li-nome">{{ a.acao }}{% if a.detalhe %} <span class="muted" style="font-weight:400;">— {{ a.detalhe }}</span>{% endif %}</div>
+                <div class="li-meta">por {{ a.admin_nome or '—' }} • {{ a.quando }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p class="vazio">Nenhuma ação registrada ainda.</p>
+    {% endif %}
+</div>
 {% endblock %}

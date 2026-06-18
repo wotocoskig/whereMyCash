@@ -1,41 +1,81 @@
 {% extends "base.html" %}
 {% block title %}Orçamentos{% endblock %}
 
+{% block extra_css %}
+        .orc-item { padding: 14px 0; border-bottom: 1px solid var(--border); }
+        .orc-item:last-child { border-bottom: none; }
+        .orc-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
+        .orc-nome { font-weight: 600; }
+        .orc-num { color: var(--muted); font-size: 13px; }
+        .orc-acoes { display: flex; gap: 6px; flex-shrink: 0; }
+        .orc-acoes form { width: auto; margin: 0; }
+        .barra-trilho { background: var(--track); border-radius: 8px; overflow: hidden; height: 9px; }
+        .barra-orc { height: 100%; border-radius: 8px; transition: width .5s ease; }
+        .orc-ok { background: var(--receita); }
+        .orc-alerta { background: #d99a2b; }
+        .orc-estourou { background: var(--despesa); }
+        .orc-aviso { font-size: 12.5px; margin-top: 6px; }
+{% endblock %}
+
 {% block conteudo %}
     <div class="card">
         <h3 class="sec-h"><i class="ti ti-target-arrow"></i> Novo orçamento</h3>
-        <p class="sec-sub">Defina um limite de gasto mensal por categoria.</p>
+        <p class="sec-sub">Defina um limite de gasto mensal por categoria. Para editar, clique no lápis.</p>
         <form action="{{ url_for('orcamentos') }}" method="POST">
             <input type="hidden" name="csrf" value="{{ csrf }}">
-            <input type="text" name="categoria" list="lista-categorias"
+            <input type="text" id="orc-cat" name="categoria" list="lista-categorias"
                    placeholder="Categoria (digite ou escolha a sua)" required>
             <datalist id="lista-categorias">
                 {% for c in categorias %}<option value="{{ c }}"></option>{% endfor %}
             </datalist>
-            <input type="text" inputmode="decimal" name="limite" placeholder="Limite mensal (ex: 600,00)" required>
+            <input type="text" id="orc-limite" inputmode="decimal" name="limite" placeholder="Limite mensal (ex: 600,00)" required>
             <button type="submit" class="btn">Salvar orçamento</button>
         </form>
     </div>
 
     <div class="card">
-        <h3>Seus orçamentos</h3>
+        <h3>Seus orçamentos {% if mes_atual %}<span class="muted" style="font-weight:400;font-size:13px;">— {{ mes_atual|mes_br }}</span>{% endif %}</h3>
         {% if orcamentos %}
             {% for o in orcamentos %}
-                <div class="li-row">
-                    <span class="li-ic"><i class="ti ti-target-arrow"></i></span>
-                    <div class="li-info">
-                        <div class="li-nome">{{ o.categoria }}</div>
-                        <div class="li-meta">Limite: <span class="num">R$ {{ o.limite|moeda }}</span> / mês</div>
+                <div class="orc-item">
+                    <div class="orc-topo">
+                        <span class="orc-nome">{{ o.categoria }}</span>
+                        <span style="display:flex; align-items:center; gap:8px;">
+                            <span class="orc-num num">R$ {{ o.gasto|moeda }} / R$ {{ o.limite|moeda }} · {{ "%.0f"|format(o.pct) }}%</span>
+                            <span class="orc-acoes">
+                                <button type="button" class="btn-acao orc-edit" data-cat="{{ o.categoria }}" data-lim="{{ o.limite|moeda }}" title="Editar"><i class="ti ti-pencil"></i></button>
+                                <form action="{{ url_for('excluir_orcamento', id=o.id) }}" method="POST"
+                                      data-confirmar="Excluir este orçamento?" data-perigo>
+                                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                                    <button type="submit" class="btn-acao" title="Excluir"><i class="ti ti-trash"></i></button>
+                                </form>
+                            </span>
+                        </span>
                     </div>
-                    <form action="{{ url_for('excluir_orcamento', id=o.id) }}" method="POST"
-                          data-confirmar="Excluir este orçamento?" data-perigo style="width: auto;">
-                        <input type="hidden" name="csrf" value="{{ csrf }}">
-                        <button type="submit" class="btn-acao" title="Excluir"><i class="ti ti-trash"></i></button>
-                    </form>
+                    <div class="barra-trilho">
+                        <div class="barra-orc {% if o.estourou %}orc-estourou{% elif o.pct >= 80 %}orc-alerta{% else %}orc-ok{% endif %}" style="width: {{ o.pct_barra }}%;"></div>
+                    </div>
+                    {% if o.estourou %}
+                        <div class="orc-aviso despesa">⚠️ Estourou R$ {{ (-o.restante)|moeda }}</div>
+                    {% else %}
+                        <div class="orc-aviso muted">Resta R$ {{ o.restante|moeda }}</div>
+                    {% endif %}
                 </div>
             {% endfor %}
         {% else %}
             <p class="vazio">Nenhum orçamento ainda. Crie o primeiro acima! 👆</p>
         {% endif %}
     </div>
+
+    <script>
+        // Editar com 1 clique: preenche o formulário com a categoria/limite e foca.
+        document.querySelectorAll('.orc-edit').forEach(function (b) {
+            b.addEventListener('click', function () {
+                document.getElementById('orc-cat').value = b.dataset.cat;
+                document.getElementById('orc-limite').value = b.dataset.lim;
+                document.getElementById('orc-limite').focus();
+                document.getElementById('orc-cat').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+        });
+    </script>
 {% endblock %}

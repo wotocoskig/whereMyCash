@@ -42,6 +42,7 @@
 
     <div class="card">
         <h3>Seus recorrentes</h3>
+        <p class="sec-sub">Parar um recorrente só impede a geração de novos meses — os lançamentos já criados permanecem.</p>
         {% if recorrentes %}
             {% for r in recorrentes %}
                 <div class="li-row">
@@ -53,7 +54,7 @@
                         <div class="li-meta">{{ r.categoria }} • todo dia {{ r.dia }}{% if r.tipo == 'DESPESA' %} • {{ 'crédito' if r.forma == 'CREDITO' else 'débito' }}{% endif %}</div>
                     </div>
                     <form action="{{ url_for('excluir_recorrente', id=r.id) }}" method="POST"
-                          data-confirmar="Excluir este recorrente? Os lançamentos já criados continuam." data-perigo style="width: auto;">
+                          data-confirmar="Parar este recorrente? Ele deixa de gerar novos lançamentos; os já lançados permanecem no extrato." data-acao="Parar" data-perigo style="width: auto;">
                         <input type="hidden" name="csrf" value="{{ csrf }}">
                         <button type="submit" class="btn-acao" title="Excluir"><i class="ti ti-trash"></i></button>
                     </form>
