@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Fatura{% endblock %}
+
+{% block extra_css %}
+        .fat-hero { text-align: center; padding: 6px 0 4px; }
+        .fat-hero .rotulo { color: var(--muted); font-size: 13px; font-weight: 600; }
+        .fat-hero .valor { font-family: 'Space Grotesk', sans-serif; font-size: 34px; font-weight: 700;
+                           color: var(--despesa); letter-spacing: -0.5px; margin-top: 2px; }
+        .mes-item { padding: 14px 0; border-bottom: 1px solid var(--border); }
+        .mes-item:last-child { border-bottom: none; }
+        .mes-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+        .mes-nome { font-weight: 700; text-transform: capitalize; }
+        .mes-aberto { font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: var(--despesa); }
+        .mes-meta { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+        .tag-mes { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 6px;
+                   background: var(--accent-soft); color: var(--accent); vertical-align: 2px; }
+        .tag-mes.atraso { background: rgba(220,80,80,.16); color: var(--despesa); }
+        .barra { height: 7px; border-radius: 6px; background: var(--border); overflow: hidden; margin-top: 9px; }
+        .barra > span { display: block; height: 100%; background: var(--receita); border-radius: 6px; }
+{% endblock %}
+
+{% block conteudo %}
+<div class="card">
+    <div class="fat-hero">
+        <div class="rotulo">Total ainda a pagar no crédito</div>
+        <div class="valor">R$ {{ total_aberto|moeda }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="sec-h"><i class="ti ti-credit-card"></i> Fatura por mês</h3>
+    <p class="sec-sub">O que cai no crédito de cada mês, já contando as parcelas futuras.</p>
+    {% if meses %}
+        {% for m in meses %}
+        <div class="mes-item">
+            <div class="mes-top">
+                <span class="mes-nome">{{ m.mes|mes_br }}
+                    {% if m.atual %}<span class="tag-mes">este mês</span>{% endif %}
+                    {% if m.atrasado %}<span class="tag-mes atraso">em aberto</span>{% endif %}
+                </span>
+                <span class="mes-aberto">R$ {{ m.aberto|moeda }}</span>
+            </div>
+            <div class="mes-meta">
+                {{ m.qtd }} lançamento(s) · total R$ {{ m.total|moeda }}{% if m.pago > 0.005 %} · R$ {{ m.pago|moeda }} já pago{% endif %}
+            </div>
+            {% if m.pago > 0.005 %}
+            <div class="barra"><span style="width: {{ m.pct_pago }}%;"></span></div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <p class="vazio">Nenhuma compra no crédito a pagar. 🎉</p>
+    {% endif %}
+</div>
+{% endblock %}

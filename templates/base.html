@@ -32,6 +32,9 @@
             --text: #1b1f17; --muted: #6c7464; --border: #e7e9e0;
             --accent: #556b2f; --accent-hover: #445824; --accent-ink: #ffffff;
             --accent-soft: rgba(85,107,47,.12);
+            --accent-grad: linear-gradient(135deg, #6f8a36, #4c6328);
+            --glow: 0 8px 22px rgba(85,107,47,.26);
+            --bg-glow1: rgba(85,107,47,.10); --bg-glow2: rgba(125,155,90,.07);
             --receita: #3c8a40; --despesa: #c2553d; --track: #eceee5;
             --shadow: 0 4px 16px rgba(28,36,18,.07);
             --radius: 18px; --radius-sm: 12px;
@@ -43,6 +46,9 @@
             --text: #e9ede6; --muted: #838b7d; --border: rgba(255,255,255,.07);
             --accent: #a6cb55; --accent-hover: #b6d96a; --accent-ink: #10160c;
             --accent-soft: rgba(166,203,85,.14);
+            --accent-grad: linear-gradient(135deg, #c2e072, #8fb53f);
+            --glow: 0 10px 28px rgba(166,203,85,.22);
+            --bg-glow1: rgba(166,203,85,.11); --bg-glow2: rgba(64,124,98,.12);
             --receita: #86cf80; --despesa: #ef8a6a; --track: rgba(255,255,255,.06);
             --shadow: 0 14px 36px rgba(0,0,0,.45);
         }
@@ -52,6 +58,14 @@
             background: var(--bg); color: var(--text); accent-color: var(--accent);
             margin: 0; line-height: 1.5; -webkit-font-smoothing: antialiased;
             transition: background 0.2s ease, color 0.2s ease;
+            min-height: 100vh;
+        }
+        /* Brilho ambiente atrás de tudo (sutil, não atrapalha leitura) */
+        body::before {
+            content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+            background:
+                radial-gradient(55% 45% at 88% -8%, var(--bg-glow1), transparent 62%),
+                radial-gradient(50% 40% at -12% 8%, var(--bg-glow2), transparent 58%);
         }
         .num { font-family: 'Space Grotesk', sans-serif; font-feature-settings: 'tnum'; letter-spacing: -0.3px; }
 
@@ -64,9 +78,10 @@
                   padding: 16px 0 12px; }
         .tb-brand { display: flex; align-items: center; gap: 9px; font-family: 'Space Grotesk';
                     font-weight: 600; font-size: 17px; color: var(--text); text-decoration: none; letter-spacing: -0.3px; }
-        .tb-brand .cash { color: var(--accent); }
+        .tb-brand .cash { background: var(--accent-grad); -webkit-background-clip: text;
+                          background-clip: text; color: transparent; }
         .tb-logo { width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
-                   background: linear-gradient(140deg, var(--accent), var(--accent-hover));
+                   background: var(--accent-grad); box-shadow: var(--glow);
                    display: flex; align-items: center; justify-content: center; color: var(--accent-ink); font-size: 17px; }
         .tb-actions { display: flex; align-items: center; gap: 8px; }
         .icon-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text);
@@ -74,17 +89,21 @@
                     display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
                     transition: border-color .15s, color .15s; }
         .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .icon-btn.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
         /* RAIL: barra inferior no celular */
         .rail { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
                 display: flex; background: var(--surface); border-top: 1px solid var(--border);
                 padding-bottom: env(safe-area-inset-bottom); }
-        .rail a { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        .rail a { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
                   gap: 3px; padding: 9px 2px; color: var(--muted); text-decoration: none;
                   font-size: 10px; font-weight: 600; letter-spacing: .2px; transition: color .15s; }
-        .rail a i { font-size: 21px; }
+        .rail a i { font-size: 21px; transition: filter .15s; }
         .rail a span { white-space: nowrap; }
         .rail a.on { color: var(--accent); }
+        .rail a.on i { filter: drop-shadow(0 2px 7px var(--accent-soft)); }
+        .rail a.on::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+                             width: 26px; height: 3px; border-radius: 0 0 4px 4px; background: var(--accent-grad); }
         .rail-brand { display: none; }
 
         /* ---------- COMPONENTES ---------- */
@@ -109,9 +128,9 @@
         select option { background: var(--card-bg); color: var(--text); }
         input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent);
             box-shadow: 0 0 0 3px var(--accent-soft); }
-        .btn { background: var(--accent); color: var(--accent-ink); border: none; font-weight: 600;
-               cursor: pointer; transition: background .15s, transform .05s; }
-        .btn:hover { background: var(--accent-hover); }
+        .btn { background: var(--accent-grad); color: var(--accent-ink); border: none; font-weight: 600;
+               cursor: pointer; box-shadow: var(--glow); transition: filter .15s, box-shadow .15s, transform .05s; }
+        .btn:hover { filter: brightness(1.06); }
         .btn:active { transform: scale(.99); }
         .link { color: var(--accent); text-decoration: none; font-weight: 600; }
         .link:hover { text-decoration: underline; }
@@ -249,6 +268,7 @@
         <a class="{{ 'on' if request.endpoint == 'index' }}" href="{{ url_for('index') }}"><i class="ti ti-home"></i><span>Início</span></a>
         <a class="{{ 'on' if request.endpoint == 'orcamentos' }}" href="{{ url_for('orcamentos') }}"><i class="ti ti-target-arrow"></i><span>Orçam.</span></a>
         <a class="{{ 'on' if request.endpoint == 'recorrentes' }}" href="{{ url_for('recorrentes') }}"><i class="ti ti-repeat"></i><span>Recorr.</span></a>
+        <a class="{{ 'on' if request.endpoint == 'fatura' }}" href="{{ url_for('fatura') }}"><i class="ti ti-credit-card"></i><span>Fatura</span></a>
         <a class="{{ 'on' if request.endpoint == 'evolucao' }}" href="{{ url_for('evolucao') }}"><i class="ti ti-chart-line"></i><span>Evolução</span></a>
         <a class="{{ 'on' if request.endpoint == 'categorias' }}" href="{{ url_for('categorias') }}"><i class="ti ti-tag"></i><span>Categ.</span></a>
         {% if eh_admin %}
@@ -266,7 +286,7 @@
             <div class="tb-actions">
                 <button class="icon-btn" id="btnTema" onclick="alternarTema()" title="Alternar tema"><i id="ic-tema" class="ti ti-moon"></i></button>
                 {% if session.get('usuario_id') %}
-                    <a class="icon-btn" href="{{ url_for('trocar_senha') }}" title="Trocar senha"><i class="ti ti-key"></i></a>
+                    <a class="icon-btn {{ 'on' if request.endpoint in ['conta', 'trocar_senha'] }}" href="{{ url_for('conta') }}" title="Conta"><i class="ti ti-settings"></i></a>
                     <a class="icon-btn" href="{{ url_for('logout') }}" title="Sair"><i class="ti ti-logout"></i></a>
                 {% endif %}
             </div>

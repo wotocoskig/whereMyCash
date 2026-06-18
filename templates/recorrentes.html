@@ -53,6 +53,7 @@
                         <div class="li-nome">{{ r.descricao }} <span class="num {{ r.tipo|lower }}">R$ {{ r.valor|moeda }}</span></div>
                         <div class="li-meta">{{ r.categoria }} • todo dia {{ r.dia }}{% if r.tipo == 'DESPESA' %} • {{ 'crédito' if r.forma == 'CREDITO' else 'débito' }}{% endif %}</div>
                     </div>
+                    <a href="{{ url_for('editar_recorrente', id=r.id) }}" class="btn-acao" title="Editar"><i class="ti ti-pencil"></i></a>
                     <form action="{{ url_for('excluir_recorrente', id=r.id) }}" method="POST"
                           data-confirmar="Parar este recorrente? Ele deixa de gerar novos lançamentos; os já lançados permanecem no extrato." data-acao="Parar" data-perigo style="width: auto;">
                         <input type="hidden" name="csrf" value="{{ csrf }}">

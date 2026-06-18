@@ -1,6 +1,7 @@
 import calendar
 import csv
 import io
+import json
 import math
 import os
 import secrets
@@ -616,6 +617,47 @@ def index():
         })
     orcamentos_status.sort(key=lambda x: x["pct"], reverse=True)
 
+    # Insights: frases automáticas sobre o mês selecionado (só quando há gastos
+    # e um mês específico está selecionado — em "todos" não faria sentido comparar).
+    insights = []
+    if mes_sel != 'todos' and total_despesas > 0:
+        try:
+            ano_sel, num_mes = (int(x) for x in mes_sel.split('-'))
+        except (ValueError, TypeError):
+            ano_sel = num_mes = None
+
+        if ano_sel:
+            # Comparação com o mês anterior.
+            mes_ant = (date(ano_sel, num_mes, 1) - timedelta(days=1)).strftime("%Y-%m")
+            gasto_ant = sum(
+                t["valor"] for t in todas
+                if t["tipo"] == "DESPESA" and t["data"] and t["data"].startswith(mes_ant)
+            )
+            if gasto_ant > 0:
+                diff = (total_despesas - gasto_ant) / gasto_ant * 100
+                if diff >= 1:
+                    insights.append(f"📈 Você gastou {diff:.0f}% a mais que no mês anterior.")
+                elif diff <= -1:
+                    insights.append(f"📉 Boa! Você gastou {abs(diff):.0f}% a menos que no mês anterior.")
+                else:
+                    insights.append("➖ Seus gastos ficaram parecidos com os do mês anterior.")
+
+            # Média diária: até hoje no mês corrente, mês cheio nos passados.
+            if mes_sel == mes_atual:
+                dias = date.today().day
+            else:
+                dias = calendar.monthrange(ano_sel, num_mes)[1]
+            if dias > 0:
+                insights.append(f"💸 Média de R$ {moeda(total_despesas / dias)} por dia em gastos.")
+
+        # Maior categoria do mês.
+        if resumo:
+            top = resumo[0]
+            insights.append(
+                f"🏆 Onde mais foi: {top['categoria']} "
+                f"(R$ {moeda(top['total'])}, {top['pct_total']:.0f}% dos gastos)."
+            )
+
     # Extrato: parte do recorte do mês e aplica busca + filtros de categoria/forma.
     q = request.args.get('q', '').strip()
     cat_sel = request.args.get('cat', '')
@@ -666,6 +708,7 @@ def index():
         total_pago=total_pago,
         pct_pago=pct_pago,
         resumo=resumo,
+        insights=insights,
         orcamentos=orcamentos_status,
         meses=meses,
         categorias=categorias,
@@ -975,6 +1018,63 @@ def recorrentes():
     )
 
 
+@app.route('/recorrentes/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar_recorrente(id):
+    uid = session['usuario_id']
+    conn = get_db()
+
+    if request.method == 'POST':
+        descricao = request.form.get('descricao', '').strip()
+        categoria = request.form.get('categoria', '').strip()
+        tipo = request.form.get('tipo', 'DESPESA')
+        forma = request.form.get('forma') if tipo == 'DESPESA' else None
+        detalhes = request.form.get('detalhes', '').strip() or None
+        try:
+            valor = parse_valor(request.form.get('valor', ''))
+        except (ValueError, TypeError):
+            valor = None
+        try:
+            dia = int(request.form.get('dia', ''))
+        except (ValueError, TypeError):
+            dia = None
+
+        erro = None
+        if not descricao or not categoria:
+            erro = "Preencha descrição e categoria."
+        elif valor is None:
+            erro = "Valor inválido. Use números (ex.: 50,00)."
+        elif valor == 0:
+            erro = "O valor não pode ser zero."
+        elif dia is None or dia < 1 or dia > 31:
+            erro = "O dia do mês deve ser um número de 1 a 31."
+
+        if erro:
+            flash(erro, "erro")
+            conn.close()
+            return redirect(url_for('editar_recorrente', id=id))
+        registrar_categoria(conn, uid, categoria)
+        # Edita só o modelo: afeta os PRÓXIMOS meses; os já lançados não mudam.
+        conn.execute(
+            "UPDATE recorrentes SET descricao = ?, valor = ?, tipo = ?, categoria = ?, "
+            "forma = ?, detalhes = ?, dia = ? WHERE id = ? AND usuario_id = ?",
+            (descricao, valor, tipo, categoria, forma, detalhes, dia, id, uid),
+        )
+        conn.commit()
+        conn.close()
+        flash("Recorrente atualizado. Vale para os próximos meses.", "ok")
+        return redirect(url_for('recorrentes'))
+
+    r = conn.execute(
+        "SELECT * FROM recorrentes WHERE id = ? AND usuario_id = ?", (id, uid)
+    ).fetchone()
+    categorias = categorias_do_usuario(conn, uid)
+    conn.close()
+    if r is None:
+        return redirect(url_for('recorrentes'))
+    return render_template('recorrente_editar.html', r=r, categorias=categorias)
+
+
 @app.route('/recorrentes/excluir/<int:id>', methods=['POST'])
 @login_required
 def excluir_recorrente(id):
@@ -1076,6 +1176,93 @@ def exportar():
     )
 
 
+# ---- Conta: backup e restauração dos dados do usuário ----
+
+# Tabelas e colunas incluídas no backup (só dados do próprio usuário).
+BACKUP_TABELAS = {
+    "transacoes": ["descricao", "valor", "tipo", "categoria", "data",
+                   "forma", "detalhes", "pago", "grupo"],
+    "categorias": ["nome"],
+    "orcamentos": ["categoria", "limite"],
+    "recorrentes": ["descricao", "valor", "tipo", "categoria", "forma",
+                    "detalhes", "dia", "ultimo_mes_gerado"],
+}
+
+
+@app.route('/conta')
+@login_required
+def conta():
+    return render_template('conta.html')
+
+
+@app.route('/backup')
+@login_required
+def backup():
+    """Baixa um arquivo JSON com TODOS os dados do próprio usuário."""
+    uid = session['usuario_id']
+    conn = get_db()
+    dados = {"versao": 1, "gerado_em": datetime.now().strftime("%Y-%m-%d %H:%M")}
+    for tabela, cols in BACKUP_TABELAS.items():
+        rows = conn.execute(
+            f"SELECT {', '.join(cols)} FROM {tabela} WHERE usuario_id = ?", (uid,)
+        ).fetchall()
+        dados[tabela] = [dict(r) for r in rows]
+    conn.close()
+
+    corpo = json.dumps(dados, ensure_ascii=False, indent=2)
+    nome = "wheresmycash-backup-" + date.today().isoformat() + ".json"
+    return Response(
+        corpo,
+        mimetype='application/json',
+        headers={'Content-Disposition': f'attachment; filename={nome}'},
+    )
+
+
+@app.route('/restaurar', methods=['POST'])
+@login_required
+def restaurar():
+    """Substitui TODOS os dados do usuário pelos do arquivo de backup enviado."""
+    uid = session['usuario_id']
+    arquivo = request.files.get('arquivo')
+    if not arquivo or not arquivo.filename:
+        flash("Escolha um arquivo de backup (.json) para restaurar.", "erro")
+        return redirect(url_for('conta'))
+
+    try:
+        dados = json.loads(arquivo.read().decode('utf-8'))
+        assert isinstance(dados, dict)
+        assert all(isinstance(dados.get(t, []), list) for t in BACKUP_TABELAS)
+    except (ValueError, AssertionError, UnicodeDecodeError):
+        flash("Arquivo inválido. Use um backup gerado aqui mesmo.", "erro")
+        return redirect(url_for('conta'))
+
+    conn = get_db()
+    try:
+        # Substitui: apaga o que é do usuário e regrava a partir do backup.
+        for tabela in BACKUP_TABELAS:
+            conn.execute(f"DELETE FROM {tabela} WHERE usuario_id = ?", (uid,))
+        total = 0
+        for tabela, cols in BACKUP_TABELAS.items():
+            campos = cols + ["usuario_id"]
+            ph = ", ".join("?" for _ in campos)
+            sql = f"INSERT INTO {tabela} ({', '.join(campos)}) VALUES ({ph})"
+            for item in dados.get(tabela, []):
+                if not isinstance(item, dict):
+                    continue
+                valores = [item.get(c) for c in cols] + [uid]
+                conn.execute(sql, valores)
+                total += 1
+        conn.commit()
+    except (sqlite3.Error, TypeError):
+        conn.rollback()
+        conn.close()
+        flash("Não consegui restaurar: o arquivo parece corrompido.", "erro")
+        return redirect(url_for('conta'))
+    conn.close()
+    flash(f"Backup restaurado! {total} registro(s) recuperados. ✅", "ok")
+    return redirect('/')
+
+
 # ---- PWA: service worker (servido na raiz para ter escopo '/') ----
 
 @app.route('/sw.js')
@@ -1136,6 +1323,52 @@ def evolucao():
         for m, d in ordenados
     ]
     return render_template('evolucao.html', dados=dados)
+
+
+@app.route('/fatura')
+@login_required
+def fatura():
+    """Quanto cai na fatura de cada mês: gastos no CRÉDITO agrupados por mês,
+    incluindo as parcelas que caem lá na frente."""
+    uid = session['usuario_id']
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT data, valor, pago, descricao, categoria FROM transacoes "
+        "WHERE usuario_id = ? AND tipo = 'DESPESA' AND forma = 'CREDITO' AND data IS NOT NULL",
+        (uid,),
+    ).fetchall()
+    conn.close()
+
+    mes_atual = date.today().strftime("%Y-%m")
+    por_mes = {}
+    for r in rows:
+        m = r["data"][:7]
+        d = por_mes.setdefault(m, {"total": 0.0, "pago": 0.0, "aberto": 0.0, "qtd": 0})
+        d["total"] += r["valor"]
+        d["qtd"] += 1
+        if r["pago"]:
+            d["pago"] += r["valor"]
+        else:
+            d["aberto"] += r["valor"]
+
+    # Mostra do mês atual em diante (o que ainda vai pesar no bolso) + meses
+    # passados que ainda tenham fatura em aberto (atrasados).
+    meses = []
+    for m, d in sorted(por_mes.items()):
+        if m >= mes_atual or d["aberto"] > 0.005:
+            meses.append({
+                "mes": m,
+                "total": d["total"],
+                "pago": d["pago"],
+                "aberto": d["aberto"],
+                "qtd": d["qtd"],
+                "atrasado": m < mes_atual and d["aberto"] > 0.005,
+                "atual": m == mes_atual,
+                "pct_pago": (d["pago"] / d["total"] * 100) if d["total"] else 0,
+            })
+
+    total_aberto = sum(x["aberto"] for x in meses)
+    return render_template('fatura.html', meses=meses, total_aberto=total_aberto)
 
 
 # ---- Trocar a própria senha (qualquer usuário logado) ----

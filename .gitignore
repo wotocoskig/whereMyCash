@@ -15,3 +15,4 @@ __pycache__/
 # Ambiente virtual
 venv/
 .venv/
+server.log

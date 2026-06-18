@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Editar recorrente{% endblock %}
+
+{% block extra_css %}
+        #rec-campo-forma label, #rec-campo-forma { margin-top: 0; }
+{% endblock %}
+
+{% block conteudo %}
+<div class="card" style="max-width: 460px; margin: 4px auto;">
+    <h3 class="sec-h"><i class="ti ti-pencil"></i> Editar recorrente</h3>
+    <p class="sec-sub">As mudanças valem para os <strong>próximos meses</strong>. Os lançamentos já criados não mudam.</p>
+    <form action="{{ url_for('editar_recorrente', id=r.id) }}" method="POST">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="toggle-tipo">
+            <input type="radio" name="tipo" id="tipo-gasto" value="DESPESA"
+                   {% if r.tipo == 'DESPESA' %}checked{% endif %} onchange="recAtualiza()">
+            <label for="tipo-gasto" class="opt opt-gasto"><i class="ti ti-arrow-up-right"></i> Gasto</label>
+            <input type="radio" name="tipo" id="tipo-ganho" value="RECEITA"
+                   {% if r.tipo == 'RECEITA' %}checked{% endif %} onchange="recAtualiza()">
+            <label for="tipo-ganho" class="opt opt-ganho"><i class="ti ti-arrow-down-left"></i> Ganho</label>
+        </div>
+
+        <input type="text" name="descricao" value="{{ r.descricao }}" placeholder="Descrição (ex: Aluguel)" required>
+        <input type="text" inputmode="decimal" name="valor" value="{{ r.valor|moeda }}" placeholder="Valor (ex: 1500,00)" required>
+        <input type="text" name="categoria" value="{{ r.categoria }}" list="lista-categorias" placeholder="Categoria" required>
+        <datalist id="lista-categorias">
+            {% for c in categorias %}<option value="{{ c }}"></option>{% endfor %}
+        </datalist>
+
+        <label for="dia">Dia do mês</label>
+        <input type="number" id="dia" name="dia" min="1" max="31" value="{{ r.dia }}" required>
+
+        <div id="rec-campo-forma">
+            <select name="forma" id="forma">
+                <option value="DEBITO" {% if r.forma != 'CREDITO' %}selected{% endif %}>Débito (já pago)</option>
+                <option value="CREDITO" {% if r.forma == 'CREDITO' %}selected{% endif %}>Crédito (a pagar)</option>
+            </select>
+        </div>
+
+        <textarea name="detalhes" rows="2" placeholder="Detalhes (opcional)">{{ r.detalhes or '' }}</textarea>
+        <button type="submit" class="btn" style="margin-top: 12px;">Salvar alterações</button>
+    </form>
+
+    <p style="text-align: center; margin-bottom: 0;">
+        <a class="link" href="{{ url_for('recorrentes') }}">← Voltar sem salvar</a>
+    </p>
+</div>
+
+<script>
+    function recAtualiza() {
+        var ehGasto = document.getElementById('tipo-gasto').checked;
+        document.getElementById('rec-campo-forma').style.display = ehGasto ? 'block' : 'none';
+    }
+    recAtualiza();
+</script>
+{% endblock %}

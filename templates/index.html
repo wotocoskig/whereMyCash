@@ -3,8 +3,12 @@
 
 {% block extra_css %}
         /* ---- HERO saldo ---- */
-        .hero { padding: 20px 20px 22px;
-                background: radial-gradient(130% 150% at 100% 0%, var(--accent-soft), transparent 55%), var(--card-bg); }
+        .hero { padding: 20px 20px 22px; position: relative; overflow: hidden;
+                background: radial-gradient(120% 140% at 100% 0%, var(--accent-soft), transparent 52%),
+                            radial-gradient(90% 120% at -10% 110%, var(--bg-glow2), transparent 55%), var(--card-bg); }
+        .hero::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+                       border-radius: inherit; box-shadow: inset 0 1px 0 var(--accent-soft); }
+        .hero-saldo { text-shadow: 0 2px 18px var(--accent-soft); }
         .hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
         .hero-greet { font-size: 15px; font-weight: 600; }
         .hero-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); font-weight: 600; margin-top: 2px; }
@@ -71,6 +75,10 @@
         .pg-btn:hover { border-color: var(--accent); color: var(--accent); }
         .pg-btn.off { opacity: .4; pointer-events: none; }
         .limpar { display: inline-block; margin-top: 6px; font-size: 13px; }
+        .insights-lista { list-style: none; padding: 0; margin: 0; }
+        .insights-lista li { font-size: 14px; line-height: 1.5; padding: 7px 0; border-bottom: 1px solid var(--border); }
+        .insights-lista li:last-child { border-bottom: none; padding-bottom: 0; }
+        .insights-lista li:first-child { padding-top: 0; }
         #campo-parcelas small { display: block; font-size: 12px; margin-top: 2px; }
         /* telas bem estreitas (ex.: 320px): evita distorção */
         @media (max-width: 360px) {
@@ -121,6 +129,16 @@
             <div class="m-val num" style="color: #d99a2b;">R$ {{ total_a_pagar|moeda }}</div>
         </div>
     </div>
+
+    <!-- INSIGHTS -->
+    {% if insights %}
+    <div class="card insights">
+        <h3 class="sec-h"><i class="ti ti-bulb"></i> Resumo do mês</h3>
+        <ul class="insights-lista">
+            {% for frase in insights %}<li>{{ frase }}</li>{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 
     <!-- NOVA TRANSAÇÃO -->
     <div class="card">
