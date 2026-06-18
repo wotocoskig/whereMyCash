@@ -945,10 +945,19 @@ def exportar():
 
 @app.route('/sw.js')
 def service_worker():
+    # Cache-first para os estáticos (fontes/ícones): ficam disponíveis mesmo
+    # com rede instável e sem depender de CDN externo.
     js = (
+        "const C='wmc-static-v1';\n"
         "self.addEventListener('install', e => self.skipWaiting());\n"
         "self.addEventListener('activate', e => self.clients.claim());\n"
-        "self.addEventListener('fetch', e => {});\n"
+        "self.addEventListener('fetch', e => {\n"
+        "  const u = new URL(e.request.url);\n"
+        "  if (e.request.method === 'GET' && u.origin === location.origin && u.pathname.startsWith('/static/')) {\n"
+        "    e.respondWith(caches.open(C).then(c => c.match(e.request).then(r =>\n"
+        "      r || fetch(e.request).then(resp => { if (resp.ok) c.put(e.request, resp.clone()); return resp; }))));\n"
+        "  }\n"
+        "});\n"
     )
     return Response(js, mimetype='application/javascript')
 

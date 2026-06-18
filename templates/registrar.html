@@ -2,32 +2,31 @@
 {% block title %}Criar conta — wheresMyCash{% endblock %}
 
 {% block conteudo %}
-<div class="card" style="max-width: 380px; margin: 40px auto;">
-    <h1 style="font-size: 22px;">Criar conta ✨</h1>
-    <p class="muted" style="margin-top: -8px;">Leva menos de um minuto.</p>
+<div class="card" style="max-width: 380px; margin: 24px auto;">
+    <h3 class="sec-h"><i class="ti ti-user-plus"></i> Criar conta</h3>
+    <p class="sec-sub">Leva menos de um minuto.</p>
 
     <form action="{{ url_for('registrar') }}" method="POST">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
         <label for="username">Usuário</label>
-        <input type="text" id="username" name="username" value="{{ username or '' }}"
-               minlength="3" required autofocus>
+        <input type="text" id="username" name="username" value="{{ username or '' }}" minlength="3" required autofocus>
 
         <label for="senha">Senha</label>
         <div class="senha-wrap">
             <input type="password" id="senha" name="senha" minlength="4" required>
-            <button type="button" class="ver-senha" onclick="verSenha(this)" aria-label="Mostrar senha">👁️</button>
+            <button type="button" class="ver-senha" onclick="verSenha(this)" aria-label="Mostrar senha"><i class="ti ti-eye"></i></button>
         </div>
 
         <label for="senha2">Repita a senha</label>
         <div class="senha-wrap">
             <input type="password" id="senha2" name="senha2" minlength="4" required>
-            <button type="button" class="ver-senha" onclick="verSenha(this)" aria-label="Mostrar senha">👁️</button>
+            <button type="button" class="ver-senha" onclick="verSenha(this)" aria-label="Mostrar senha"><i class="ti ti-eye"></i></button>
         </div>
 
-        <button type="submit" class="btn" style="margin-top: 12px;">Criar conta</button>
+        <button type="submit" class="btn" style="margin-top: 14px;">Criar conta</button>
     </form>
 
-    <p class="muted" style="text-align: center; margin-bottom: 0;">
+    <p class="muted" style="text-align: center; margin: 16px 0 0;">
         Já tem conta? <a class="link" href="{{ url_for('login') }}">Entrar</a>
     </p>
 </div>

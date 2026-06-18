@@ -2,8 +2,8 @@
 {% block title %}Editar lançamento{% endblock %}
 
 {% block conteudo %}
-<div class="card" style="max-width: 420px; margin: 20px auto;">
-    <h1 style="font-size: 22px;">✏️ Editar lançamento</h1>
+<div class="card" style="max-width: 460px; margin: 4px auto;">
+    <h3 class="sec-h"><i class="ti ti-pencil"></i> Editar lançamento</h3>
 
     <form action="/editar/{{ t.id }}" method="POST">
         <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -11,10 +11,10 @@
         <div class="toggle-tipo">
             <input type="radio" name="tipo" id="tipo-gasto" value="DESPESA"
                    {% if t.tipo == 'DESPESA' %}checked{% endif %} onchange="toggleForma()">
-            <label for="tipo-gasto" class="opt opt-gasto">➖ Gasto</label>
+            <label for="tipo-gasto" class="opt opt-gasto"><i class="ti ti-arrow-up-right"></i> Gasto</label>
             <input type="radio" name="tipo" id="tipo-ganho" value="RECEITA"
                    {% if t.tipo == 'RECEITA' %}checked{% endif %} onchange="toggleForma()">
-            <label for="tipo-ganho" class="opt opt-ganho">➕ Ganho</label>
+            <label for="tipo-ganho" class="opt opt-ganho"><i class="ti ti-arrow-down-left"></i> Ganho</label>
         </div>
 
         <label for="descricao">Descrição</label>

@@ -63,11 +63,7 @@
         .tx-val { font-size: 14.5px; }
         .acoes { display: flex; gap: 6px; }
         .acoes form { width: auto; margin: 0; }
-        .btn-acao { width: 34px; height: 34px; padding: 0; font-size: 15px; border-radius: 10px;
-                    display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
-                    margin: 0; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
-        .btn-acao:hover { border-color: var(--accent); color: var(--accent); }
-        .vazio { color: var(--muted); font-style: italic; padding: 8px 0; }
+        /* .btn-acao e .vazio vêm do base.html (componentes compartilhados) */
         .paginacao { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
         .paginacao .pg { font-size: 13px; color: var(--muted); }
         .pg-btn { padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
@@ -93,7 +89,7 @@
         <div class="card hero">
             <div class="hero-top">
                 <div>
-                    <div class="hero-greet">Olá, {{ session['usuario_nome'] }}</div>
+                    <div class="hero-greet">Olá, {{ session.get('usuario_nome', '') }}</div>
                     <div class="hero-lbl">Saldo {% if mes_sel != 'todos' %}de {{ mes_sel|mes_br }}{% else %}— todos os meses{% endif %}</div>
                 </div>
                 <select name="mes" id="mes" class="hero-mes" onchange="this.form.submit()">
