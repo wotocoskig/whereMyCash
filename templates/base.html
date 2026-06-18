@@ -210,14 +210,15 @@
             .rail a { flex: none; flex-direction: column; gap: 5px; padding: 12px 4px;
                       border-radius: 14px; font-size: 11px; }
             .rail a.on { background: var(--accent-soft); }
-            .main { margin-left: 104px; max-width: 880px; padding: 0 36px 40px; }
-            .main.no-rail { margin-left: 0; }
+            /* reserva o espaço da sidebar fixa e centraliza o conteúdo no resto */
+            body.logged { padding-left: 104px; }
+            .main { max-width: 860px; margin: 0 auto; padding: 0 36px 44px; }
             .topbar { padding: 26px 0 18px; }
         }
         {% block extra_css %}{% endblock %}
     </style>
 </head>
-<body>
+<body class="{{ 'logged' if session.get('usuario_id') else '' }}">
     {% if session.get('usuario_id') %}
     <nav class="rail">
         <a class="rail-brand" href="{{ url_for('index') }}" aria-label="wheresMyCash"><i class="ti ti-wallet"></i></a>
