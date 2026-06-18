@@ -76,6 +76,15 @@
         .pg-btn.off { opacity: .4; pointer-events: none; }
         .limpar { display: inline-block; margin-top: 6px; font-size: 13px; }
         #campo-parcelas small { display: block; font-size: 12px; margin-top: 2px; }
+        /* telas bem estreitas (ex.: 320px): evita distorção */
+        @media (max-width: 360px) {
+            .metrics { grid-template-columns: 1fr 1fr; }
+            .hero-top { flex-wrap: wrap; }
+            .hero .dd, .hero-mes { width: 100%; }
+            .busca-linha { flex-wrap: wrap; }
+            .busca-linha .dd, .busca-linha select { flex: 1 1 100%; }
+            .busca-linha .btn { width: 100%; }
+        }
 {% endblock %}
 
 {% block conteudo %}

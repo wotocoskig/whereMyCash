@@ -2,34 +2,27 @@
 {% block title %}Recorrentes{% endblock %}
 
 {% block extra_css %}
-        .rec-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
-        .rec-item:last-child { border-bottom: none; }
-        .rec-desc { font-weight: 600; }
-        .rec-meta { color: var(--muted); font-size: 13px; }
         #rec-campo-forma label, #rec-campo-forma { margin-top: 0; }
 {% endblock %}
 
 {% block conteudo %}
     <div class="card">
-        <h3>🔁 Novo recorrente</h3>
-        <p class="muted" style="margin-top: -6px;">Cadastre uma vez; o lançamento é criado automaticamente todo mês.</p>
+        <h3 class="sec-h"><i class="ti ti-repeat"></i> Novo recorrente</h3>
+        <p class="sec-sub">Cadastre uma vez; o lançamento é criado automaticamente todo mês.</p>
         <form action="{{ url_for('recorrentes') }}" method="POST">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <div class="toggle-tipo">
                 <input type="radio" name="tipo" id="tipo-gasto" value="DESPESA" checked onchange="recAtualiza()">
-                <label for="tipo-gasto" class="opt opt-gasto">➖ Gasto</label>
+                <label for="tipo-gasto" class="opt opt-gasto"><i class="ti ti-arrow-up-right"></i> Gasto</label>
                 <input type="radio" name="tipo" id="tipo-ganho" value="RECEITA" onchange="recAtualiza()">
-                <label for="tipo-ganho" class="opt opt-ganho">➕ Ganho</label>
+                <label for="tipo-ganho" class="opt opt-ganho"><i class="ti ti-arrow-down-left"></i> Ganho</label>
             </div>
 
             <input type="text" name="descricao" placeholder="Descrição (ex: Aluguel)" required>
             <input type="text" inputmode="decimal" name="valor" placeholder="Valor (ex: 1500,00)" required>
-            <input type="text" name="categoria" list="lista-categorias"
-                   placeholder="Categoria (digite ou escolha a sua)" required>
+            <input type="text" name="categoria" list="lista-categorias" placeholder="Categoria (digite ou escolha a sua)" required>
             <datalist id="lista-categorias">
-                {% for c in categorias %}
-                    <option value="{{ c }}"></option>
-                {% endfor %}
+                {% for c in categorias %}<option value="{{ c }}"></option>{% endfor %}
             </datalist>
 
             <label for="dia">Dia do mês</label>
@@ -51,27 +44,23 @@
         <h3>Seus recorrentes</h3>
         {% if recorrentes %}
             {% for r in recorrentes %}
-                <div class="rec-item">
-                    <div>
-                        <div class="rec-desc">
-                            {{ r.descricao }}
-                            <span class="{{ r.tipo|lower }}">R$ {{ r.valor|moeda }}</span>
-                        </div>
-                        <div class="rec-meta">
-                            {{ r.categoria }} • todo dia {{ r.dia }}
-                            {% if r.tipo == 'DESPESA' %} • {{ 'crédito' if r.forma == 'CREDITO' else 'débito' }}{% endif %}
-                        </div>
+                <div class="li-row">
+                    <span class="li-ic {{ 'in' if r.tipo == 'RECEITA' else 'out' }}">
+                        <i class="ti {{ 'ti-arrow-down-left' if r.tipo == 'RECEITA' else 'ti-arrow-up-right' }}"></i>
+                    </span>
+                    <div class="li-info">
+                        <div class="li-nome">{{ r.descricao }} <span class="num {{ r.tipo|lower }}">R$ {{ r.valor|moeda }}</span></div>
+                        <div class="li-meta">{{ r.categoria }} • todo dia {{ r.dia }}{% if r.tipo == 'DESPESA' %} • {{ 'crédito' if r.forma == 'CREDITO' else 'débito' }}{% endif %}</div>
                     </div>
                     <form action="{{ url_for('excluir_recorrente', id=r.id) }}" method="POST"
                           data-confirmar="Excluir este recorrente? Os lançamentos já criados continuam." data-perigo style="width: auto;">
                         <input type="hidden" name="csrf" value="{{ csrf }}">
-                        <button type="submit" class="btn-acao"
-                                style="width:auto; border:1px solid var(--border); background:var(--card-bg); color:var(--text); padding:7px 12px; border-radius:9px; cursor:pointer;">🗑️</button>
+                        <button type="submit" class="btn-acao" title="Excluir"><i class="ti ti-trash"></i></button>
                     </form>
                 </div>
             {% endfor %}
         {% else %}
-            <p class="muted" style="font-style: italic;">Nenhum recorrente ainda. Crie o primeiro acima! 👆</p>
+            <p class="vazio">Nenhum recorrente ainda. Crie o primeiro acima! 👆</p>
         {% endif %}
     </div>
 

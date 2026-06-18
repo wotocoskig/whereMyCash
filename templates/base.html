@@ -117,6 +117,25 @@
         .muted { color: var(--muted); }
         .receita { color: var(--receita); font-weight: 700; }
         .despesa { color: var(--despesa); font-weight: 700; }
+        /* botão de ação (ícone) compartilhado */
+        .btn-acao { width: 34px; height: 34px; padding: 0; font-size: 15px; border-radius: 10px;
+                    display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+                    margin: 0; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
+        .btn-acao:hover { border-color: var(--accent); color: var(--accent); }
+        /* cabeçalho de seção com ícone */
+        .sec-h { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+        .sec-h i { color: var(--accent); font-size: 19px; }
+        .sec-sub { color: var(--muted); font-size: 13.5px; margin: 0 0 14px; }
+        /* linha de lista compartilhada (ícone + info + ações) */
+        .li-row { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--border); }
+        .li-row:last-child { border-bottom: none; }
+        .li-ic { width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0; display: flex;
+                 align-items: center; justify-content: center; font-size: 17px; background: var(--accent-soft); color: var(--accent); }
+        .li-ic.in { color: var(--receita); } .li-ic.out { background: rgba(194,85,61,.13); color: var(--despesa); }
+        .li-info { flex: 1; min-width: 0; }
+        .li-nome { font-weight: 600; font-size: 14.5px; }
+        .li-meta { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+        .vazio { color: var(--muted); font-style: italic; padding: 6px 0; }
 
         /* senha (olhinho) */
         .senha-wrap { position: relative; }

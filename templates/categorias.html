@@ -1,17 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Categorias{% endblock %}
 
-{% block extra_css %}
-        .cat-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
-        .cat-item:last-child { border-bottom: none; }
-        .cat-nome { font-weight: 600; }
-        .cat-uso { color: var(--muted); font-size: 13px; }
-{% endblock %}
-
 {% block conteudo %}
     <div class="card">
-        <h3>🏷️ Nova categoria</h3>
-        <p class="muted" style="margin-top: -6px;">Crie suas categorias aqui para usá-las nos lançamentos e orçamentos.</p>
+        <h3 class="sec-h"><i class="ti ti-tag"></i> Nova categoria</h3>
+        <p class="sec-sub">Crie suas categorias para usá-las nos lançamentos e orçamentos.</p>
         <form action="{{ url_for('categorias') }}" method="POST">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <input type="text" name="nome" placeholder="Nome da categoria (ex: Alimentação)" required autofocus>
@@ -23,21 +16,22 @@
         <h3>Suas categorias</h3>
         {% if categorias %}
             {% for c in categorias %}
-                <div class="cat-item">
-                    <div>
-                        <div class="cat-nome">{{ c.nome }}</div>
-                        <div class="cat-uso">{{ usos.get(c.nome|lower, 0) }} lançamento(s)</div>
+                <div class="li-row">
+                    <span class="li-ic"><i class="ti ti-tag"></i></span>
+                    <div class="li-info">
+                        <div class="li-nome">{{ c.nome }}</div>
+                        <div class="li-meta">{{ usos.get(c.nome|lower, 0) }} lançamento(s)</div>
                     </div>
                     <form action="{{ url_for('excluir_categoria', id=c.id) }}" method="POST"
                           data-confirmar="Excluir a categoria '{{ c.nome }}'? Os lançamentos já feitos continuam." data-perigo
                           style="width: auto;">
                         <input type="hidden" name="csrf" value="{{ csrf }}">
-                        <button type="submit" class="btn-acao">🗑️</button>
+                        <button type="submit" class="btn-acao" title="Excluir"><i class="ti ti-trash"></i></button>
                     </form>
                 </div>
             {% endfor %}
         {% else %}
-            <p class="muted" style="font-style: italic;">Nenhuma categoria cadastrada ainda. Crie a primeira acima! 👆</p>
+            <p class="vazio">Nenhuma categoria cadastrada ainda. Crie a primeira acima! 👆</p>
         {% endif %}
     </div>
 {% endblock %}
