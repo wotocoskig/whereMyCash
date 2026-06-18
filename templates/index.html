@@ -2,111 +2,138 @@
 {% block title %}Meu controle de gastos{% endblock %}
 
 {% block extra_css %}
-        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
-        .stat { background: var(--card-bg); border-radius: 16px; box-shadow: var(--shadow); padding: 16px; text-align: center; }
-        .stat .rotulo { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        .stat .num { font-size: 19px; font-weight: 800; margin-top: 4px; }
-        .filtro { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-        .filtro label { margin: 0; white-space: nowrap; }
-        .filtro select { margin: 0; max-width: 220px; }
-        .filtro .dd { margin: 0; flex: 1; max-width: 220px; }
-        .busca-linha .dd { margin: 0; flex: 1; }
+        /* ---- HERO saldo ---- */
+        .hero { padding: 20px 20px 22px;
+                background: radial-gradient(130% 150% at 100% 0%, var(--accent-soft), transparent 55%), var(--card-bg); }
+        .hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .hero-greet { font-size: 15px; font-weight: 600; }
+        .hero-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+        .hero-saldo { font-size: 40px; font-weight: 600; margin-top: 10px; line-height: 1; }
+        .hero-saldo .cents { font-size: .58em; color: var(--muted); }
+        .hero-mes { width: auto; margin: 0; }
+        .hero .dd { margin: 0; min-width: 132px; }
+        /* ---- métricas ---- */
+        .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+        .metric { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
+                  box-shadow: var(--shadow); padding: 14px 13px; min-width: 0; }
+        .m-top { display: flex; align-items: center; gap: 5px; font-size: 10.5px; text-transform: uppercase;
+                 letter-spacing: .4px; color: var(--muted); font-weight: 600; }
+        .m-top i { font-size: 14px; }
+        .m-val { font-size: 18px; font-weight: 600; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* ---- gráfico / barras ---- */
         .grafico { list-style: none; padding: 0; margin: 0; }
-        .grafico li { margin-bottom: 12px; }
-        .barra-topo { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
-        .barra-trilho { background: var(--track); border-radius: 6px; overflow: hidden; height: 16px; }
-        .barra-preenchida { background: linear-gradient(90deg, var(--accent), var(--accent-hover)); height: 100%; border-radius: 6px; transition: width 0.4s ease; }
-        .barra-paga { background: var(--receita); height: 100%; border-radius: 6px; transition: width 0.4s ease; }
-        .barra-orc { height: 100%; border-radius: 6px; transition: width 0.4s ease; }
+        .grafico li { margin-bottom: 13px; }
+        .grafico li:last-child { margin-bottom: 0; }
+        .barra-topo { display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 6px; }
+        .barra-trilho { background: var(--track); border-radius: 8px; overflow: hidden; height: 9px; }
+        .barra-preenchida { background: linear-gradient(90deg, var(--accent-hover), var(--accent)); height: 100%; border-radius: 8px; transition: width .5s ease; }
+        .barra-paga { background: var(--receita); height: 100%; border-radius: 8px; transition: width .5s ease; }
+        .barra-orc { height: 100%; border-radius: 8px; transition: width .5s ease; }
         .orc-ok { background: var(--receita); }
-        .orc-alerta { background: #f39c12; }
+        .orc-alerta { background: #d99a2b; }
         .orc-estourou { background: var(--despesa); }
-        .orc-aviso { font-size: 13px; margin-top: 3px; }
-        .pagto-linha { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
-        .tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; vertical-align: middle; }
-        .tag-credito { background: rgba(220, 38, 38, 0.13); color: var(--despesa); }
-        .tag-debito { background: rgba(22, 163, 74, 0.13); color: var(--receita); }
-        .extrato { list-style: none; padding: 0; margin: 0; }
-        .extrato li { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); gap: 10px; }
-        .extrato li:last-child { border-bottom: none; }
-        .extrato .info { flex: 1; min-width: 0; }
-        .extrato .desc { font-weight: 600; }
-        .extrato .meta { font-size: 12px; color: var(--muted); }
-        .extrato .detalhe { font-size: 13px; color: var(--muted); font-style: italic; margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
-        .acoes { display: flex; gap: 6px; flex-shrink: 0; }
-        .acoes form { width: auto; margin: 0; }
-        .btn-acao { padding: 7px 12px; font-size: 13px; border-radius: 9px; text-decoration: none; display: inline-block; width: auto; margin: 0; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); cursor: pointer; }
-        .btn-acao:hover { border-color: var(--accent); }
-        .vazio { color: var(--muted); font-style: italic; }
-        .busca { margin-bottom: 14px; }
-        .busca input, .busca select { margin: 4px 0; }
+        .orc-aviso { font-size: 12.5px; margin-top: 5px; }
+        .pagto-linha { display: flex; justify-content: space-between; align-items: center; font-size: 14.5px; }
+        .pagto-linha strong { font-size: 16px; }
+        /* ---- tags ---- */
+        .tag { font-size: 10.5px; font-weight: 600; padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
+        .tag-credito { background: rgba(194,85,61,.14); color: var(--despesa); }
+        .tag-debito { background: var(--accent-soft); color: var(--muted); }
+        .tag-pago { background: rgba(60,138,64,.15); color: var(--receita); }
+        /* ---- extrato ---- */
+        .secao-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+        .secao-topo h3 { margin: 0; }
+        .busca { margin-bottom: 12px; }
+        .busca input, .busca select { margin: 5px 0; }
         .busca-linha { display: flex; gap: 8px; }
+        .busca-linha .dd { margin: 0; flex: 1; }
         .busca-linha select { flex: 1; }
-        .busca-linha .btn { width: auto; flex-shrink: 0; }
-        .extrato-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
-        .extrato-topo h3 { margin: 0; }
-        .paginacao { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-        .paginacao .muted { font-size: 13px; }
-        .btn-acao.desabilitado { opacity: 0.4; cursor: default; }
+        .busca-linha .btn { width: auto; flex-shrink: 0; padding: 12px 16px; }
+        .extrato { list-style: none; padding: 0; margin: 0; }
+        .extrato li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .extrato li:last-child { border-bottom: none; }
+        .tx-ic { width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 17px; }
+        .tx-ic.in { background: var(--accent-soft); color: var(--receita); }
+        .tx-ic.out { background: rgba(194,85,61,.13); color: var(--despesa); }
+        .extrato .info { flex: 1; min-width: 0; }
+        .extrato .desc { font-weight: 600; font-size: 14.5px; }
+        .extrato .meta { font-size: 12px; color: var(--muted); margin-top: 1px; }
+        .extrato .detalhe { font-size: 12.5px; color: var(--muted); font-style: italic; margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
+        .tx-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+        .tx-val { font-size: 14.5px; }
+        .acoes { display: flex; gap: 6px; }
+        .acoes form { width: auto; margin: 0; }
+        .btn-acao { width: 34px; height: 34px; padding: 0; font-size: 15px; border-radius: 10px;
+                    display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+                    margin: 0; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
+        .btn-acao:hover { border-color: var(--accent); color: var(--accent); }
+        .vazio { color: var(--muted); font-style: italic; padding: 8px 0; }
+        .paginacao { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
+        .paginacao .pg { font-size: 13px; color: var(--muted); }
+        .pg-btn { padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
+                  color: var(--text); text-decoration: none; font-size: 13px; font-weight: 600; }
+        .pg-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .pg-btn.off { opacity: .4; pointer-events: none; }
         .limpar { display: inline-block; margin-top: 6px; font-size: 13px; }
         #campo-parcelas small { display: block; font-size: 12px; margin-top: 2px; }
-        @media (max-width: 480px) {
-            .stat .num { font-size: 16px; }
-            .stat .rotulo { font-size: 10px; }
-        }
 {% endblock %}
 
 {% block conteudo %}
-    <!-- Filtro por mês -->
-    <form class="filtro" method="GET" action="/">
-        <label for="mes">Período:</label>
-        <select name="mes" id="mes" onchange="this.form.submit()">
-            <option value="todos" {% if mes_sel == 'todos' %}selected{% endif %}>Todos os meses</option>
-            {% for m in meses %}
-                <option value="{{ m }}" {% if mes_sel == m %}selected{% endif %}>{{ m|mes_br }}</option>
-            {% endfor %}
-        </select>
-    </form>
-
-    <!-- Cards de resumo -->
-    <div class="stats">
-        <div class="stat">
-            <div class="rotulo">Saldo</div>
-            <div class="num" style="color: {% if saldo >= 0 %}var(--receita){% else %}var(--despesa){% endif %};">
-                R$ {{ saldo|moeda }}
+    <!-- HERO -->
+    <form method="GET" action="/">
+        <div class="card hero">
+            <div class="hero-top">
+                <div>
+                    <div class="hero-greet">Olá, {{ session['usuario_nome'] }}</div>
+                    <div class="hero-lbl">Saldo {% if mes_sel != 'todos' %}de {{ mes_sel|mes_br }}{% else %}— todos os meses{% endif %}</div>
+                </div>
+                <select name="mes" id="mes" class="hero-mes" onchange="this.form.submit()">
+                    <option value="todos" {% if mes_sel == 'todos' %}selected{% endif %}>Todos os meses</option>
+                    {% for m in meses %}
+                        <option value="{{ m }}" {% if mes_sel == m %}selected{% endif %}>{{ m|mes_br }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% set sp = (saldo|moeda).split(',') %}
+            <div class="hero-saldo num" style="color: {% if saldo >= 0 %}var(--receita){% else %}var(--despesa){% endif %};">
+                R$ {{ sp[0] }}<span class="cents">,{{ sp[1] }}</span>
             </div>
         </div>
-        <div class="stat">
-            <div class="rotulo">Ganhos</div>
-            <div class="num receita">R$ {{ total_receitas|moeda }}</div>
+    </form>
+
+    <!-- MÉTRICAS -->
+    <div class="metrics">
+        <div class="metric">
+            <div class="m-top"><i class="ti ti-trending-up" style="color: var(--receita);"></i> Ganhos</div>
+            <div class="m-val num receita">R$ {{ total_receitas|moeda }}</div>
         </div>
-        <div class="stat">
-            <div class="rotulo">Gastos</div>
-            <div class="num despesa">R$ {{ total_despesas|moeda }}</div>
+        <div class="metric">
+            <div class="m-top"><i class="ti ti-trending-down" style="color: var(--despesa);"></i> Gastos</div>
+            <div class="m-val num despesa">R$ {{ total_despesas|moeda }}</div>
+        </div>
+        <div class="metric">
+            <div class="m-top"><i class="ti ti-clock" style="color: #d99a2b;"></i> A pagar</div>
+            <div class="m-val num" style="color: #d99a2b;">R$ {{ total_a_pagar|moeda }}</div>
         </div>
     </div>
 
-    <!-- Nova transação -->
+    <!-- NOVA TRANSAÇÃO -->
     <div class="card">
-        <h3>➕ Nova transação</h3>
+        <h3>Nova transação</h3>
         <form action="/adicionar" method="POST">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-            <!-- Seletor de tipo: dois botões no topo -->
+            <input type="hidden" name="csrf" value="{{ csrf }}">
             <div class="toggle-tipo">
                 <input type="radio" name="tipo" id="tipo-gasto" value="DESPESA" checked onchange="toggleForma()">
-                <label for="tipo-gasto" class="opt opt-gasto">➖ Gasto</label>
+                <label for="tipo-gasto" class="opt opt-gasto"><i class="ti ti-arrow-up-right"></i> Gasto</label>
                 <input type="radio" name="tipo" id="tipo-ganho" value="RECEITA" onchange="toggleForma()">
-                <label for="tipo-ganho" class="opt opt-ganho">➕ Ganho</label>
+                <label for="tipo-ganho" class="opt opt-ganho"><i class="ti ti-arrow-down-left"></i> Ganho</label>
             </div>
 
             <input type="text" name="descricao" placeholder="Descrição (ex: Mercado)" required>
             <input type="text" inputmode="decimal" name="valor" placeholder="Valor (ex: 50,00)" required>
-            <input type="text" name="categoria" list="lista-categorias"
-                   placeholder="Categoria (digite ou escolha a sua)" required>
+            <input type="text" name="categoria" list="lista-categorias" placeholder="Categoria (digite ou escolha a sua)" required>
             <datalist id="lista-categorias">
-                {% for c in categorias %}
-                    <option value="{{ c }}"></option>
-                {% endfor %}
+                {% for c in categorias %}<option value="{{ c }}"></option>{% endfor %}
             </datalist>
             <textarea name="detalhes" rows="2" placeholder="Detalhes (opcional) — o que você comprou?"></textarea>
             <input type="date" name="data" value="{{ hoje }}" required>
@@ -125,53 +152,48 @@
         </form>
     </div>
 
-    <!-- Status de pagamento dos gastos (conceito mensal: oculto em "Todos os meses") -->
+    <!-- PAGAMENTOS -->
     {% if mes_sel != 'todos' and total_despesas > 0 %}
     <div class="card">
-        <h3>💳 Pagamentos do período</h3>
+        <h3>Pagamentos do período</h3>
         <div class="pagto-linha">
-            <span>✅ Já pago (débito)</span>
-            <strong class="receita">R$ {{ total_pago|moeda }}</strong>
+            <span class="muted">Já pago (débito)</span>
+            <strong class="receita num">R$ {{ total_pago|moeda }}</strong>
         </div>
-        <div class="barra-trilho" style="margin: 8px 0 14px;">
+        <div class="barra-trilho" style="margin: 9px 0 14px;">
             <div class="barra-paga" style="width: {{ pct_pago }}%;"></div>
         </div>
         <div class="pagto-linha">
-            <span>⏳ Falta pagar (crédito)</span>
-            <strong class="despesa">R$ {{ total_a_pagar|moeda }}</strong>
+            <span class="muted">Falta pagar (crédito)</span>
+            <strong class="despesa num">R$ {{ total_a_pagar|moeda }}</strong>
         </div>
     </div>
     {% endif %}
 
     <script>
-        // Forma de pagamento só em Gasto; parcelas só em Gasto no Crédito.
         function atualizarCampos() {
             var ehGasto = document.getElementById('tipo-gasto').checked;
             var forma = document.getElementById('forma');
-            // Mostra/esconde o WRAPPER (inclui o dropdown customizado).
             document.getElementById('campo-forma').style.display = ehGasto ? 'block' : 'none';
             var ehCredito = forma.value === 'CREDITO';
             document.getElementById('campo-parcelas').style.display = (ehGasto && ehCredito) ? 'block' : 'none';
         }
-        // Compatibilidade com os botões de tipo, que chamam toggleForma().
         function toggleForma() { atualizarCampos(); }
         atualizarCampos();
     </script>
 
-    <!-- Gráfico de gastos por categoria -->
+    <!-- GRÁFICO -->
     <div class="card">
-        <h3>📊 Onde seu dinheiro está indo</h3>
+        <h3>Onde seu dinheiro está indo</h3>
         {% if resumo %}
             <ul class="grafico">
                 {% for r in resumo %}
                     <li>
                         <div class="barra-topo">
                             <strong>{{ r.categoria }}</strong>
-                            <span class="muted">R$ {{ r.total|moeda }} ({{ "%.0f"|format(r.pct_total) }}%)</span>
+                            <span class="muted num">R$ {{ r.total|moeda }} · {{ "%.0f"|format(r.pct_total) }}%</span>
                         </div>
-                        <div class="barra-trilho">
-                            <div class="barra-preenchida" style="width: {{ r.pct_barra }}%;"></div>
-                        </div>
+                        <div class="barra-trilho"><div class="barra-preenchida" style="width: {{ r.pct_barra }}%;"></div></div>
                     </li>
                 {% endfor %}
             </ul>
@@ -180,23 +202,22 @@
         {% endif %}
     </div>
 
-    <!-- Acompanhamento de orçamentos (conceito mensal: oculto em "Todos os meses") -->
+    <!-- ORÇAMENTOS -->
     {% if mes_sel != 'todos' and orcamentos %}
     <div class="card">
-        <h3>🎯 Orçamentos do mês</h3>
+        <h3>Orçamentos do mês</h3>
         <ul class="grafico">
             {% for o in orcamentos %}
                 <li>
                     <div class="barra-topo">
                         <strong>{{ o.categoria }}</strong>
-                        <span class="muted">R$ {{ o.gasto|moeda }} / R$ {{ o.limite|moeda }} ({{ "%.0f"|format(o.pct) }}%)</span>
+                        <span class="muted num">R$ {{ o.gasto|moeda }} / R$ {{ o.limite|moeda }} · {{ "%.0f"|format(o.pct) }}%</span>
                     </div>
                     <div class="barra-trilho">
-                        <div class="barra-orc {% if o.estourou %}orc-estourou{% elif o.pct >= 80 %}orc-alerta{% else %}orc-ok{% endif %}"
-                             style="width: {{ o.pct_barra }}%;"></div>
+                        <div class="barra-orc {% if o.estourou %}orc-estourou{% elif o.pct >= 80 %}orc-alerta{% else %}orc-ok{% endif %}" style="width: {{ o.pct_barra }}%;"></div>
                     </div>
                     {% if o.estourou %}
-                        <div class="orc-aviso despesa">⚠️ Estourou R$ {{ (-o.restante)|moeda }}</div>
+                        <div class="orc-aviso despesa">Estourou R$ {{ (-o.restante)|moeda }}</div>
                     {% else %}
                         <div class="orc-aviso muted">Resta R$ {{ o.restante|moeda }}</div>
                     {% endif %}
@@ -206,29 +227,26 @@
     </div>
     {% endif %}
 
-    <!-- Extrato -->
+    <!-- EXTRATO -->
     <div class="card">
-        <div class="extrato-topo">
-            <h3>🧾 Extrato {% if mes_sel != 'todos' %}— {{ mes_sel|mes_br }}{% endif %}</h3>
-            <a class="link" href="{{ url_for('exportar') }}">⬇️ Exportar CSV</a>
+        <div class="secao-topo">
+            <h3>Extrato {% if mes_sel != 'todos' %}— {{ mes_sel|mes_br }}{% endif %}</h3>
+            <a class="link" href="{{ url_for('exportar') }}"><i class="ti ti-download" style="vertical-align:-2px;"></i> CSV</a>
         </div>
 
-        <!-- Busca e filtros do extrato -->
         <form class="busca" method="GET" action="/">
             <input type="hidden" name="mes" value="{{ mes_sel }}">
-            <input type="text" name="q" value="{{ q }}" placeholder="🔍 Buscar (descrição, categoria, detalhes)">
+            <input type="text" name="q" value="{{ q }}" placeholder="Buscar (descrição, categoria, detalhes)">
             <div class="busca-linha">
                 <select name="cat">
                     <option value="">Todas as categorias</option>
-                    {% for c in categorias %}
-                        <option value="{{ c }}" {% if cat_sel == c %}selected{% endif %}>{{ c }}</option>
-                    {% endfor %}
+                    {% for c in categorias %}<option value="{{ c }}" {% if cat_sel == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
                 </select>
                 <select name="forma">
                     <option value="">Crédito e débito</option>
                     <option value="CREDITO" {% if forma_sel == 'CREDITO' %}selected{% endif %}>Só crédito</option>
                     <option value="DEBITO" {% if forma_sel == 'DEBITO' %}selected{% endif %}>Só débito</option>
-                    <option value="A_PAGAR" {% if forma_sel == 'A_PAGAR' %}selected{% endif %}>Só a pagar (crédito)</option>
+                    <option value="A_PAGAR" {% if forma_sel == 'A_PAGAR' %}selected{% endif %}>Só a pagar</option>
                 </select>
                 <button type="submit" class="btn">Filtrar</button>
             </div>
@@ -240,37 +258,29 @@
         <ul class="extrato">
             {% for t in transacoes %}
                 <li>
+                    <span class="tx-ic {{ 'in' if t.tipo == 'RECEITA' else 'out' }}">
+                        <i class="ti {{ 'ti-arrow-down-left' if t.tipo == 'RECEITA' else 'ti-arrow-up-right' }}"></i>
+                    </span>
                     <span class="info">
                         <span class="desc">{{ t.descricao }}</span>
-                        <span class="{{ t.tipo|lower }}">R$ {{ t.valor|moeda }}</span>
-                        {% if t.tipo == 'DESPESA' and t.forma == 'CREDITO' %}
-                            {% if t.pago %}
-                                <span class="tag tag-debito">crédito ✓ pago</span>
-                            {% else %}
-                                <span class="tag tag-credito">crédito · a pagar</span>
-                            {% endif %}
-                        {% elif t.tipo == 'DESPESA' %}
-                            <span class="tag tag-debito">débito</span>
-                        {% endif %}
-                        <div class="meta">{{ t.categoria }} • {{ t.data|data_br }}</div>
-                        {% if t.detalhes %}
-                            <div class="detalhe">📝 {{ t.detalhes }}</div>
-                        {% endif %}
+                        <div class="meta">{{ t.categoria }} • {{ t.data|data_br }}{% if t.tipo == 'DESPESA' and t.forma == 'CREDITO' %} • {% if t.pago %}<span class="tag tag-pago">crédito pago</span>{% else %}<span class="tag tag-credito">a pagar</span>{% endif %}{% elif t.tipo == 'DESPESA' %} • <span class="tag tag-debito">débito</span>{% endif %}</div>
+                        {% if t.detalhes %}<div class="detalhe">{{ t.detalhes }}</div>{% endif %}
                     </span>
-                    <span class="acoes">
-                        {% if t.tipo == 'DESPESA' and t.forma == 'CREDITO' %}
-                            <form action="/pagar/{{ t.id }}" method="POST">
+                    <span class="tx-right">
+                        <span class="tx-val num {{ t.tipo|lower }}">{{ '+' if t.tipo == 'RECEITA' else '−' }} R$ {{ t.valor|moeda }}</span>
+                        <span class="acoes">
+                            {% if t.tipo == 'DESPESA' and t.forma == 'CREDITO' %}
+                                <form action="/pagar/{{ t.id }}" method="POST">
+                                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                                    <button type="submit" class="btn-acao" title="{{ 'Marcar como a pagar' if t.pago else 'Marcar fatura como paga' }}"><i class="ti {{ 'ti-arrow-back-up' if t.pago else 'ti-check' }}"></i></button>
+                                </form>
+                            {% endif %}
+                            <a class="btn-acao" href="/editar/{{ t.id }}" title="Editar"><i class="ti ti-pencil"></i></a>
+                            <form action="/excluir/{{ t.id }}" method="POST" data-confirmar="Excluir este lançamento?" data-perigo>
                                 <input type="hidden" name="csrf" value="{{ csrf }}">
-                                <button type="submit" class="btn-acao"
-                                        title="{{ 'Marcar como a pagar' if t.pago else 'Marcar fatura como paga' }}">{{ '↩️' if t.pago else '✅' }}</button>
+                                <button type="submit" class="btn-acao" title="Excluir"><i class="ti ti-trash"></i></button>
                             </form>
-                        {% endif %}
-                        <a class="btn-acao" href="/editar/{{ t.id }}">✏️</a>
-                        <form action="/excluir/{{ t.id }}" method="POST"
-                              data-confirmar="Excluir este lançamento?" data-perigo>
-                            <input type="hidden" name="csrf" value="{{ csrf }}">
-                            <button type="submit" class="btn-acao">🗑️</button>
-                        </form>
+                        </span>
                     </span>
                 </li>
             {% else %}
@@ -285,17 +295,9 @@
         {% if total_paginas > 1 %}
             {% set base = '?mes=' ~ mes_sel ~ '&q=' ~ (q|urlencode) ~ '&cat=' ~ (cat_sel|urlencode) ~ '&forma=' ~ forma_sel %}
             <div class="paginacao">
-                {% if pagina > 1 %}
-                    <a class="btn-acao" href="{{ base }}&pagina={{ pagina - 1 }}">← Anterior</a>
-                {% else %}
-                    <span class="btn-acao desabilitado">← Anterior</span>
-                {% endif %}
-                <span class="muted">Página {{ pagina }} de {{ total_paginas }} ({{ total_itens }} lançamentos)</span>
-                {% if pagina < total_paginas %}
-                    <a class="btn-acao" href="{{ base }}&pagina={{ pagina + 1 }}">Próxima →</a>
-                {% else %}
-                    <span class="btn-acao desabilitado">Próxima →</span>
-                {% endif %}
+                <a class="pg-btn {{ 'off' if pagina <= 1 }}" href="{{ base }}&pagina={{ pagina - 1 }}">← Anterior</a>
+                <span class="pg">Página {{ pagina }} de {{ total_paginas }} · {{ total_itens }} itens</span>
+                <a class="pg-btn {{ 'off' if pagina >= total_paginas }}" href="{{ base }}&pagina={{ pagina + 1 }}">Próxima →</a>
             </div>
         {% endif %}
     </div>
