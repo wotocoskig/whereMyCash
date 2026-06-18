@@ -406,7 +406,10 @@
                 });
                 wrap.classList.add('aberto');
             }
-            wrap.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+            // Impede o handler global de 'click' (que fecha os .dd) de fechar este
+            // combo no mesmo clique que o abre (via focus). Sem isto, abrir-ao-clicar
+            // pisca aberto/fechado.
+            wrap.addEventListener('click', function (e) { e.stopPropagation(); });
             inp.addEventListener('focus', render);
             inp.addEventListener('input', render);
             // Fecha imediatamente ao sair do campo (clicar em outro campo/fora):

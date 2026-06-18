@@ -7,6 +7,7 @@ import secrets
 import sqlite3
 from datetime import date, datetime, timedelta
 from functools import wraps
+from urllib.parse import urlparse
 
 from flask import (
     Flask, render_template, request, redirect, session, flash, url_for,
@@ -44,6 +45,14 @@ def get_db():
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def voltar_para(padrao='/'):
+    """Devolve o Referer só se for do próprio site (evita open-redirect)."""
+    ref = request.referrer
+    if ref and (not urlparse(ref).netloc or urlparse(ref).netloc == urlparse(request.host_url).netloc):
+        return ref
+    return padrao
 
 
 @app.before_request
@@ -425,6 +434,7 @@ def login():
         ).fetchone()
 
         # Bloqueio temporário após muitas tentativas (anti-força-bruta).
+        falhas_base = (user["falhas"] or 0) if user else 0
         if user and user["bloqueio_ate"]:
             try:
                 ate = datetime.strptime(user["bloqueio_ate"], FMT)
@@ -434,10 +444,14 @@ def login():
                 conn.close()
                 flash("Muitas tentativas. Tente novamente em alguns minutos.", "erro")
                 return render_template('login.html', username=username)
+            if ate:
+                # Bloqueio expirou: recomeça a contagem (5 novas tentativas).
+                falhas_base = 0
+                conn.execute("UPDATE users SET falhas = 0, bloqueio_ate = NULL WHERE id = ?", (user["id"],))
 
         if user is None or not check_password_hash(user["senha_hash"], senha):
             if user:
-                falhas = (user["falhas"] or 0) + 1
+                falhas = falhas_base + 1
                 if falhas >= MAX_FALHAS:
                     bloq = (agora + timedelta(minutes=BLOQUEIO_MIN)).strftime(FMT)
                     conn.execute("UPDATE users SET falhas = ?, bloqueio_ate = ? WHERE id = ?",
@@ -737,7 +751,7 @@ def pagar(id):
     )
     conn.commit()
     conn.close()
-    return redirect(request.referrer or '/')
+    return redirect(voltar_para())
 
 
 @app.route('/excluir/<int:id>', methods=['POST'])
@@ -763,7 +777,7 @@ def excluir(id):
         conn.execute("DELETE FROM transacoes WHERE id = ? AND usuario_id = ?", (id, uid))
     conn.commit()
     conn.close()
-    return redirect(request.referrer or '/')
+    return redirect(voltar_para())
 
 
 @app.route('/editar/<int:id>', methods=['GET', 'POST'])
