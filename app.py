@@ -532,6 +532,13 @@ def index():
     # continua disponível no filtro para a visão de longo prazo.
     mes_atual = date.today().strftime("%Y-%m")
     mes_sel = request.args.get('mes', mes_atual)
+    # Aceita só 'todos' ou um mês válido; normaliza (ex.: '2026-6' -> '2026-06')
+    # e descarta lixo/mês inválido (evita 500 e recorte por prefixo errado).
+    if mes_sel != 'todos':
+        try:
+            mes_sel = datetime.strptime(mes_sel, "%Y-%m").strftime("%Y-%m")
+        except (ValueError, TypeError):
+            mes_sel = mes_atual
     uid = session['usuario_id']
 
     conn = get_db()
@@ -1249,11 +1256,20 @@ def restaurar():
             for item in dados.get(tabela, []):
                 if not isinstance(item, dict):
                     continue
-                valores = [item.get(c) for c in cols] + [uid]
-                conn.execute(sql, valores)
+                # Converte os tipos esperados; valor/limite inválidos abortam tudo
+                # (melhor recusar o arquivo do que gravar lixo que quebra a home).
+                valores = []
+                for c in cols:
+                    v = item.get(c)
+                    if v is not None and c in ("valor", "limite"):
+                        v = float(v)
+                    elif v is not None and c in ("dia", "pago"):
+                        v = int(v)
+                    valores.append(v)
+                conn.execute(sql, valores + [uid])
                 total += 1
         conn.commit()
-    except (sqlite3.Error, TypeError):
+    except (sqlite3.Error, TypeError, ValueError):
         conn.rollback()
         conn.close()
         flash("Não consegui restaurar: o arquivo parece corrompido.", "erro")
