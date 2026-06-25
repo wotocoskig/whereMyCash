@@ -67,6 +67,28 @@
                 radial-gradient(55% 45% at 88% -8%, var(--bg-glow1), transparent 62%),
                 radial-gradient(50% 40% at -12% 8%, var(--bg-glow2), transparent 58%);
         }
+        /* ---- Transição suave entre telas (View Transitions API) ----
+           Navegadores que suportam (Chrome/Android, Safari 18.2+) animam a troca
+           de página sozinhos; os demais navegam normal (degrada sem quebrar). */
+        @view-transition { navigation: auto; }
+        /* Barra de baixo e topo ficam parados — só o conteúdo faz a transição,
+           dando a sensação de app nativo. */
+        .rail { view-transition-name: rail; }
+        .topbar { view-transition-name: topbar; }
+        /* Conteúdo entra com um fade + leve subida; o antigo só some. */
+        ::view-transition-old(root) { animation: vt-sai .18s ease both; }
+        ::view-transition-new(root) { animation: vt-entra .28s ease both; }
+        @keyframes vt-sai  { to   { opacity: 0; } }
+        @keyframes vt-entra { from { opacity: 0; transform: translateY(8px); } }
+        @media (prefers-reduced-motion: reduce) {
+            ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+        }
+        /* Fallback p/ navegador sem a API (iPhone antigo etc.): fade na entrada. */
+        @supports not (view-transition-name: none) {
+            @media (prefers-reduced-motion: no-preference) {
+                .main { animation: vt-entra .28s ease both; }
+            }
+        }
         .num { font-family: 'Space Grotesk', sans-serif; font-feature-settings: 'tnum'; letter-spacing: -0.3px; }
 
         /* ---------- LAYOUT (mobile-first) ---------- */
